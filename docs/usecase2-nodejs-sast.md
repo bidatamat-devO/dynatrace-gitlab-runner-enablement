@@ -43,7 +43,7 @@ npm start
 ### Generate an SSH key in the Codespace
 
 ```bash
-ssh-keygen -t ed25519 -C "$(git config --global user.email || echo codespace)"
+ssh-keygen
 ```
 
 Press **Enter** through the prompts to accept the defaults (no passphrase needed for a throwaway Codespace).
@@ -56,13 +56,6 @@ cat ~/.ssh/id_ed25519.pub
 
 1. In GitLab, click your avatar → **Edit profile** → **SSH Keys** (or go directly to **User Settings → SSH Keys**)
 2. Click **Add new key**, paste the output above into **Key**, give it a title, change **Expiry Date** and click **Add key**
-
-### Clone the project into the Codespace
-
-```bash
-git clone git@gitlab.com:<your-gitlab-username>/firstproject.git
-cd firstproject
-```
 
 ---
 
@@ -78,9 +71,10 @@ From inside `.devcontainer/apps/kkm-pulse-demo` (it's already its own git reposi
 ```bash
 git remote remove origin 2>/dev/null || true
 git remote add origin git@gitlab.com:<your-username>/kkm-pulse-demo.git
+git remote set-url origin git@gitlab.com:<your-username>/kkm-pulse-demos.git
 git add .
 git commit -m "initial commit: kkm-pulse-demo" --allow-empty
-git push -u origin main
+git push --set-upstream origin main
 ```
 
 ---
@@ -90,24 +84,44 @@ git push -u origin main
 Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its own registration (the same `gitlab-runner` service from Use Case 1 can hold multiple registrations at once).
 
 1. In the `kkm-pulse-demo` project: **Settings → CI/CD → Runners → New project runner**
-2. Tags: `shell`
-3. Create the runner and copy the `glrt-...` token
+2. Tags: `shell`, and Create the Runner 
+3. Install the Gitlab Runner
 
-```bash
-sudo gitlab-runner register \
-  --non-interactive \
-  --url "https://gitlab.com/" \
-  --token "<glrt-...-paste-your-token-here>" \
-  --executor "shell" \
-  --description "codespace-shell-runner-kkm"
-```
+  ```
+  # Download the binary for your system
+  sudo curl -L --output /usr/local/bin/gitlab-runner https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64
 
-4. Run the gitlab-runer
+  # Give it permission to execute
+  sudo chmod +x /usr/local/bin/gitlab-runner
+
+  # Create a GitLab Runner user
+  sudo useradd --comment 'GitLab Runner' --create-home gitlab-runner --shell /bin/bash
+
+  # Install and run as a service
+  sudo gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
+  sudo gitlab-runner start
+  ```
+
+4. Copy and paste the steps number 1 or run below command with the valid `glrt-...` token
+
+  ```bash
+  sudo gitlab-runner register \
+    --non-interactive \
+    --url "https://gitlab.com/" \
+    --token "<glrt-...-paste-your-token-here>" \
+    --executor "shell" \
+    --description "codespace-shell-runner-kkm"
+  ```
+
+5. Copy paste and Run step 3 to run the gitlab-runer
 
 ```
 gitlab-runner run
 ```
 
+You will see the gitlab runner waiting for job to run on the terminal, you can validate from the Gitlab UI by clicking the View Runner
+
+//TODO to validate and clean
 ### Give the runner access to Docker and the cluster
 
 Pipeline jobs will run `docker build` and `kubectl apply` as the `gitlab-runner` Linux user — it needs the same Docker group membership and kubeconfig your own `vscode` user already has.
@@ -131,8 +145,6 @@ sudo gitlab-runner start
 
 !!! tip "Group membership needs a restart"
     `usermod -aG docker` only takes effect for **new** processes. Since you ran it before `gitlab-runner start`, the service picks it up immediately. If you ever add the group *after* the service is already running, restart it with `sudo gitlab-runner restart`.
-
----
 
 ---
 
@@ -204,6 +216,9 @@ Push it and look at the **Test** stage in the pipeline graph — you'll see the 
 
 SonarQube Community Edition installs into the Kubernetes cluster with a single command using a helper already loaded in your shell.
 
+!!! info "Add New Terminal and leave the GitLab Runner Terminal open"
+    Add New Terminal by clicking the `+ New Terminal` on the codespace.
+
 ```bash
 installSonarqube
 ```
@@ -222,7 +237,7 @@ Port `9000` is already pre-declared in this Codespace (see `devcontainer.json`):
 
 1. Open the **Ports** panel in VS Code
 2. Find port `9000` (labeled `SonarQube`)
-3. Make it Public, to make the sonar accessible from gitlab
+3. Make the port into **Public**, to make the sonar accessible from gitlab
 4. Click the globe icon next to it to **Open in Browser**
 
 Log in with **admin / admin** and set a new password when prompted.
