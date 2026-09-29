@@ -63,7 +63,11 @@ deploy-prod:
     - sed -e "s#__NAMESPACE__#kkm-pulse-prod#" -e "s#__IMAGE__#kkm-pulse-demo:${CI_COMMIT_SHORT_SHA}#" manifests/deployment.yaml | kubectl apply -f -
     - kubectl apply -f manifests/ingress-prod.yaml
     - kubectl rollout status deployment/kkm-pulse-demo -n kkm-pulse-prod --timeout=120s
-    - 'curl -sf -H "Host: kkm-pulse-prod.127.0.0.1.sslip.io" http://localhost/api/status'
+    - kubectl port-forward svc/kkm-pulse-demo 18080:3000 -n kkm-pulse-prod &
+    - PF_PID=$!
+    - sleep 3
+    - curl -sf http://localhost:18080/api/status
+    - kill $PF_PID || true
 
 notify-dynatrace-prod-deploy:
   stage: deploy_prod
@@ -77,7 +81,7 @@ notify-dynatrace-prod-deploy:
       curl -sf -X POST "${DT_TENANT}/api/v2/events/ingest"
       -H "Authorization: Api-Token ${DT_INGEST_TOKEN}"
       -H "Content-Type: application/json"
-      -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo deployed to PRODUCTION\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"version\":\"${CI_COMMIT_SHORT_SHA}\",\"environment\":\"prod\"}}"
+      -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo deployed to PRODUCTION\",\"entitySelector\":\"type(SERVICE),tag(k8s.namespace.name:kkm-pulse-prod)\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"version\":\"${CI_COMMIT_SHORT_SHA}\",\"environment\":\"prod\"}}"
 ```
 
 ```bash
@@ -100,37 +104,73 @@ git push
 
 1. Push a normal change, watch the pipeline run through `load_test`
 2. In **CI/CD → Pipelines**, open the pipeline — `deploy-prod` appears in the graph with a ▶️ (manual) icon, available to click
-3. Click it, confirm `kkm-pulse-prod` comes up:
+3. Click it, then confirm `kkm-pulse-prod` is running and open it in your browser:
 
     ```bash
     kubectl get all -n kkm-pulse-prod
-    curl -H "Host: kkm-pulse-prod.127.0.0.1.sslip.io" http://localhost/api/status
     ```
+
+    Forward port **8080** to the prod service (use a different port than dev's 80 so both can run side-by-side):
+
+    ```bash
+    kubectl port-forward svc/kkm-pulse-demo 8080:3000 -n kkm-pulse-prod &
+    ```
+
+    Verify it responds:
+
+    ```bash
+    curl -sf http://localhost:8080/api/status
+    ```
+
+    **Open the prod app in your browser:**
+
+    In the Codespace, go to the **Ports** tab — port **8080** should appear automatically once the forward is running. Click the globe icon next to it (or copy the **Forwarded Address**) to open the production app in your browser.
+
+    The forwarded URL looks like:
+    ```
+    https://<your-codespace-name>-8080.app.github.dev
+    ```
+
+    You should now see the same `kkm-pulse-demo` UI as on dev (port 80), but served from the **`kkm-pulse-prod`** namespace — a completely separate deployment. Both are live at the same time, which is the point: prod only got here because the load test passed and a human clicked ▶️.
 
 ### A failing run — prove the gate actually blocks
 
-Temporarily break the app on purpose. Edit `server.js`'s `/api/status` handler to always fail:
+Introduce an **intermittent failure** — the kind that slips past unit tests because tests only hit the endpoint once, but that load testing catches instantly. Edit `server.js`'s `/api/status` handler:
 
 ```js
 app.get('/api/status', (req, res) => {
-    res.status(500).json({ error: "simulated failure for the workshop" });
+    if (Math.random() < 0.5) {
+        res.status(500).json({ error: "intermittent failure — simulated for the workshop" });
+    } else {
+        res.json({
+            hospital: "Hospital Kuala Lumpur (Demo)",
+            status: "Normal Operations 🟢",
+            activePatients: Math.floor(Math.random() * 50) + 120,
+            averageWaitTimeMinutes: Math.floor(Math.random() * 15) + 10,
+            staffMood: "Caffeinated & Ready ☕",
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 ```
 
 ```bash
 git add server.js
-git commit -m "chore: simulate a bad build"
+git commit -m "chore: simulate intermittent failure for workshop"
 git push
 ```
 
 Watch what happens:
 
-- `deploy-dev` still succeeds — Kubernetes doesn't know the *content* of the response is wrong, only that the process is running
-- `load-test` records a 100% error rate
+- `test` (npm test) **still passes** — unit tests hit `/api/status` once or twice; 50% chance of success is good enough for a deterministic test run
+- `deploy-dev` succeeds — Kubernetes sees the process is up, not what it returns
+- `load-test` drives hundreds of requests and records ~50% error rate — far above the 10% budget
 - `notify-dynatrace-test-result` fails the error-budget check and exits non-zero
 - `deploy_prod` never appears as an available stage — there is no ▶️ button to click
 
-Check the events feed in Dynatrace too — you'll see the dev `CUSTOM_DEPLOYMENT` and the `CUSTOM_INFO` load-test-result event with `error_rate_pct: 100`, but no production deployment event, because it never ran.
+This is the key insight: the unit tests gave you a **false green**. The load test gate is what actually caught the regression before it reached production.
+
+Check the events feed in Dynatrace — you'll see the dev `CUSTOM_DEPLOYMENT` and the `CUSTOM_INFO` load-test-result event with `error_rate_pct` around 50, but no production deployment event, because it never ran.
 
 Revert the change once you've seen it:
 
@@ -138,6 +178,90 @@ Revert the change once you've seen it:
 git revert HEAD --no-edit
 git push
 ```
+
+---
+
+## Knowledge Check
+
+### Question 1 — Why does `when: manual` + `needs` create a real gate, not just a delay?
+
+`deploy-prod` declares both `when: manual` and `needs: [notify-dynatrace-test-result]`. Explain precisely why a failed load test means the manual ▶️ button **never appears** in the pipeline graph — not just that it's blocked after you click it.
+
+??? question "Show Answer"
+
+    In GitLab CI, `needs:` creates a **hard dependency**: a job is only offered for execution (manual or automatic) once all jobs listed in its `needs:` array have **succeeded**. If a `needs` dependency fails, GitLab removes the dependent job from the pipeline graph entirely — it does not show as blocked, skipped, or greyed out; it simply does not appear.
+
+    The chain works like this:
+
+    ```
+    load-test
+      └─ notify-dynatrace-test-result   ← exits 1 when error rate > 10%
+           └─ deploy-prod               ← never offered (no ▶️ button)
+                └─ notify-dynatrace-prod-deploy  ← also never offered
+    ```
+
+    **Why `when: manual` alone is not a gate:**
+
+    If you only used `when: manual` without `needs:`, the button would appear after every pipeline — including pipelines where the load test failed. A human could still click it and deploy a broken build. The combination of `needs:` (structural dependency on a passing job) and `when: manual` (human approval for a good build) is what makes this a real gate.
+
+    **The key insight:** `needs:` gates on job *outcome*, not just job *completion*. A failing job counts as "did not succeed" and silently removes everything downstream from the graph.
+
+---
+
+### Question 2 — Hands-on: Add an automatic staging deploy before the manual prod gate
+
+Your team wants an intermediate `staging` environment that deploys **automatically** after a passing load test, with production remaining a **manual** approval. Extend the pipeline with a `deploy-staging` job that:
+
+- Runs automatically (no manual click) after `notify-dynatrace-test-result` passes
+- Deploys to namespace `kkm-pulse-staging`
+- Must succeed before `deploy-prod` becomes available
+
+Sketch the job definition and explain where it fits in the `stages:` list.
+
+??? question "Show Answer"
+
+    Add `deploy_staging` between `load_test` and `deploy_prod` in the stages list, then define the job:
+
+    ```yaml
+    stages:
+      - build
+      - test
+      - code_quality
+      - package
+      - deploy_dev
+      - load_test
+      - deploy_staging    # ← new
+      - deploy_prod
+
+    deploy-staging:
+      stage: deploy_staging
+      tags:
+        - shell
+      needs:
+        - notify-dynatrace-test-result   # must pass before staging is offered
+      environment:
+        name: staging
+        url: http://kkm-pulse-staging.127.0.0.1.sslip.io
+      script:
+        - kubectl create namespace kkm-pulse-staging --dry-run=client -o yaml | kubectl apply -f -
+        - sed -e "s#__NAMESPACE__#kkm-pulse-staging#" -e "s#__IMAGE__#kkm-pulse-demo:${CI_COMMIT_SHORT_SHA}#" manifests/deployment.yaml | kubectl apply -f -
+        - kubectl rollout status deployment/kkm-pulse-demo -n kkm-pulse-staging --timeout=120s
+    ```
+
+    Update `deploy-prod`'s `needs:` to gate on `deploy-staging` instead of `notify-dynatrace-test-result`:
+
+    ```yaml
+    deploy-prod:
+      stage: deploy_prod
+      needs:
+        - deploy-staging   # ← staging must succeed before prod button appears
+      when: manual
+      ...
+    ```
+
+    **Why change `deploy-prod`'s `needs:`?**
+
+    You want the chain: load test passes → staging auto-deploys → staging succeeds → prod button appears. If `deploy-prod` still pointed at `notify-dynatrace-test-result`, the prod button would appear in parallel with the staging deploy, before you know whether staging itself is healthy. Pointing `needs` at `deploy-staging` ensures a clean staging deployment is a prerequisite for the prod approval.
 
 ---
 

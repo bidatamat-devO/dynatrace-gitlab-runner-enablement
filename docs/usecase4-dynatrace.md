@@ -166,6 +166,84 @@ Open **Problems** in Dynatrace — Davis AI should surface a CPU saturation prob
 
 `notify-dynatrace-test-result` exits non-zero when the error budget is blown. Since it's a downstream `needs` dependency, any stage you add **after** `load_test` (like a production deploy) simply won't start if this job fails — the bad build never leaves dev. Use Case 5 builds exactly that gate.
 
+---
+
+## Knowledge Check
+
+### Question 1 — Why does the pipeline rewrite `.apps.` to `.live.`?
+
+The `DT_TENANT` line transforms the `DT_ENVIRONMENT` URL before calling the Events API:
+
+```bash
+DT_TENANT=$(echo "$DT_ENVIRONMENT" | sed -E 's/\.apps\./.live./; s#/$##')
+```
+
+Explain why this transformation is necessary and what would happen if you passed `$DT_ENVIRONMENT` directly to the `curl` command.
+
+??? question "Show Answer"
+
+    Dynatrace uses **two separate hostnames** for the same tenant:
+
+    | Hostname pattern | Purpose |
+    |---|---|
+    | `*.apps.dynatrace.com` | The SSO-authenticated web UI (OAuth-based, browser sessions) |
+    | `*.live.dynatrace.com` | The classic REST API endpoints (token-based, programmatic access) |
+
+    The Environment API v2 (`/api/v2/events/ingest`) is served on the `.live.` host. If you send the `curl` request to the `.apps.` URL, the request is routed to the UI's authentication layer, which does not accept `Api-Token` auth headers — you'll receive a `401 Unauthorized` or a redirect to the login page.
+
+    **Why store `.apps.` and transform at runtime?**
+
+    The `.apps.` URL is what the Dynatrace UI displays in the address bar and what most users copy as "my environment URL". Storing it as `DT_ENVIRONMENT` and deriving the API URL in-pipeline means you only need one variable — you never have to ask someone to manually find and paste the `.live.` variant.
+
+    **Rule of thumb:** any Dynatrace API call using `Api-Token` authentication goes to `*.live.dynatrace.com`; anything browser-SSO-based goes to `*.apps.dynatrace.com`.
+
+---
+
+### Question 2 — Hands-on: Tighten the error budget gate
+
+The current `notify-dynatrace-test-result` job only fails the pipeline when the error rate exceeds 10%. Your team has agreed on stricter SLOs:
+
+- Error rate **≤ 5%**
+- Average latency **≤ 300 ms**
+
+Modify the gate section of `notify-dynatrace-test-result` so that the job fails if **either** condition is violated, and prints a clear message identifying which threshold was breached.
+
+??? question "Show Answer"
+
+    Replace the existing gate block at the bottom of `notify-dynatrace-test-result`'s `script:`:
+
+    ```yaml
+    - |
+      FAILED=0
+      if [ "$LOADTEST_ERROR_RATE" -gt 5 ]; then
+        echo "ERROR: Error rate ${LOADTEST_ERROR_RATE}% exceeds the 5% budget."
+        FAILED=1
+      fi
+      if [ "$LOADTEST_AVG_MS" -gt 300 ]; then
+        echo "ERROR: Average latency ${LOADTEST_AVG_MS}ms exceeds the 300ms threshold."
+        FAILED=1
+      fi
+      if [ "$FAILED" -eq 1 ]; then
+        echo "One or more SLO thresholds were violated — failing this job."
+        exit 1
+      fi
+      echo "All SLOs met — error rate ${LOADTEST_ERROR_RATE}%, avg latency ${LOADTEST_AVG_MS}ms."
+    ```
+
+    **Why use a `FAILED` flag instead of two separate `exit 1` calls?**
+
+    A single `exit 1` inside the first `if` block would short-circuit the script and skip the latency check entirely. Using `FAILED=1` allows both conditions to be evaluated and reported before the job exits, so the pipeline log shows exactly which SLOs were violated — not just the first one hit.
+
+    **What to update in Dynatrace:**
+
+    Also push the tightened thresholds into the `CUSTOM_INFO` event payload so the Dynatrace events feed reflects your actual SLO values:
+
+    ```bash
+    "slo_error_rate_budget\":\"5\",\"slo_latency_ms\":\"300\""
+    ```
+
+    This keeps the pipeline gate and the Dynatrace record in sync.
+
 <div class="grid cards" markdown>
 - [Continue to Use Case 5 — Dev/Prod Gates :octicons-arrow-right-24:](usecase5-devprodstages.md)
 </div>
