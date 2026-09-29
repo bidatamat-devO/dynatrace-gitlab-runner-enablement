@@ -66,7 +66,7 @@ notify-dynatrace-deploy:
       curl -sf -X POST "${DT_TENANT}/api/v2/events/ingest"
       -H "Authorization: Api-Token ${DT_INGEST_TOKEN}"
       -H "Content-Type: application/json"
-      -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo deployed to dev\",\"entitySelector\":\"tag(dt.smartscape.k8s_deployment:kkm-pulse-demo),tag(dt.smartscape.k8s_namespace:kkm-pulse-dev)\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"version\":\"${CI_COMMIT_SHORT_SHA}\",\"environment\":\"dev\"}}"
+      -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo deployed to dev\",\"entitySelector\":\"type(SERVICE),tag(k8s.namespace.name:kkm-pulse-dev)\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"version\":\"${CI_COMMIT_SHORT_SHA}\",\"environment\":\"dev\"}}"
 ```
 
 Push, run the pipeline, then in Dynatrace open **Notifications & alerting → Events** (or search `deployment.name:kkm-pulse-demo` in the events feed) to see it land — deployment events also draw a marker line on the process's timeline charts.
