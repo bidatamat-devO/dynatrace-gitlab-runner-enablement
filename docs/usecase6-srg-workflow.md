@@ -24,11 +24,50 @@ Click **+ New Guardian**, then choose **Choose Template** and select **Four Gold
 
 On the **Getting started with template** popup, click **Run Query**, select **kkm-pulse-demo**, and click **Apply Template**.
 
-### Define objectives
+### Configure the four golden signal objectives
+
+The template pre-creates four objectives. Set the **Fails if result** and **Warning if result** thresholds for each one as shown below.
+
+#### Objective 1 — Latency
+
+| Field | Value |
+|---|---|
+| **Name** | `Latency` |
+| **Fails if result** | `> 500` |
+| **Warning if result** | `> 300` |
+
+#### Objective 2 — Saturation
+
+| Field | Value |
+|---|---|
+| **Name** | `Saturation` |
+| **Fails if result** | `> 80` |
+| **Warning if result** | `> 70` |
+
+#### Objective 3 — Errors
+
+| Field | Value |
+|---|---|
+| **Name** | `Errors` |
+| **Fails if result** | `> 5` |
+| **Warning if result** | `> 2` |
+
+#### Objective 4 — Traffic
+
+| Field | Value |
+|---|---|
+| **Name** | `Traffic` |
+| **Fails if result** | `< 1` |
+| **Warning if result** | `< 5` |
+
+!!! info "Threshold units"
+    Latency thresholds are in **milliseconds**. Saturation and Errors thresholds are in **percentage (%)** of requests or resource usage. Traffic is a **request-per-minute** floor — a value below this indicates the service is not receiving meaningful load and may have stalled.
+
+### Add custom objectives
 
 Click **Add More objective** for each of the two below.
 
-#### Objective 4 — Average CPU Usage
+#### Objective 5 — Average CPU Usage
 
 | Field | Value |
 |---|---|
@@ -37,7 +76,7 @@ Click **Add More objective** for each of the two below.
 | **Fails if result** | `> 50` |
 | **Warning if result** | `> 40` |
 
-#### Objective 5 — Critical Security Vulnerabilities
+#### Objective 6 — Critical Security Vulnerabilities
 
 | Field | Value |
 |---|---|
@@ -70,27 +109,28 @@ In the `kkm-pulse-demo` GitLab project, add two CI/CD variables:
 | `DT_PLATFORM_TOKEN` | the token you just generated | Yes |
 | `SRG_GUARDIAN_ID` | your guardian ID (e.g., `guardian-XXXXXXXXXXXXXXXX`) | No |
 
-### GitLab pipeline trigger token (for Workflow to call rollback)
+### GitLab connection (for Workflow to trigger rollback pipeline)
 
-In the `kkm-pulse-demo` GitLab project: **Settings → CI/CD → Pipeline triggers → Add new trigger**
+The native **GitLab** Workflow action requires a pre-configured connection rather than a raw trigger token. This approach handles authentication through the connector and lets you select project and variables as structured fields — no manual HTTP construction needed.
 
-Name it `Dynatrace rollback` and copy:
-- The **token** (a long string)
-- The **trigger URL**, which looks like `https://gitlab.com/api/v4/projects/12345678/trigger/pipeline`
-
-Note your numeric **project ID** from the URL — you need it below.
-
-### Store the GitLab token in Dynatrace Vault
-
-In Dynatrace: **Settings → Credentials Vault → Add credential**
+In GitLab: **User icon → Edit profile → Access tokens → Add new token**
 
 | Field | Value |
 |---|---|
-| **Name** | `GITLAB_TRIGGER_TOKEN` |
-| **Type** | `Token` |
-| **Token value** | the trigger token you just copied |
+| **Token name** | `Dynatrace Workflow rollback` |
+| **Scopes** | `api` |
 
-Vault credentials are encrypted at rest and referenced in Workflows as `{{ vault.GITLAB_TRIGGER_TOKEN }}` — they never appear in plain text in logs or Workflow definitions.
+Copy the generated token.
+
+In Dynatrace: **Apps → Connections → + New connection → GitLab**
+
+| Field | Value |
+|---|---|
+| **Connection name** | `GitLab kkm-pulse-demo` |
+| **GitLab URL** | `https://gitlab.com` |
+| **Personal access token** | the token you just copied |
+
+Save the connection. It appears in the action picker as a selectable credential — the token is stored encrypted and never exposed in Workflow logs or definitions.
 
 ---
 
@@ -152,7 +192,7 @@ Push a trivial commit to trigger the pipeline through to production, approve the
 In Dynatrace: **Apps → Workflows → kkm-pulse-demo SRG → Executions** — a new execution should appear within seconds. After ~2 minutes wait plus evaluation time, the execution completes. Open it and check:
 
 - Action 1 output: `{ "waited": true }`
-- Action 2 output: `executionStatus` is `PASS` (if production is healthy)
+- Action 2 output: `Guardian validation finished, total result:` is `PASS` (if production is healthy)
 
 In **Apps → Site Reliability Guardian → kkm-pulse-demo production** you can see the evaluation listed with its per-objective results.
 
@@ -184,21 +224,56 @@ Open the Workflow in edit mode and add **Action 3**.
 
 ### Action 3 — Trigger GitLab rollback (conditional)
 
-Add an **HTTP Request** action:
+Before adding this action, two one-time setup steps are required in Dynatrace: enabling the GitLab connection and allowlisting the outbound GitLab URL.
+
+#### Step A — Verify the GitLab connection is available
+
+The connection you created in Section 2 must be visible to Workflows. Confirm it in:
+
+**Apps → Connections** — the `GitLab kkm-pulse-demo` entry should show **Status: Connected**.
+
+If it is missing, re-create it following the steps in [Section 2 — GitLab connection](#2-create-credentials).
+
+#### Step B — Add GitLab to the external request allowlist
+
+Dynatrace Workflows block outbound HTTP calls to unlisted hosts by default. You must explicitly allowlist `gitlab.com` before the GitLab action can fire.
+
+In Dynatrace: **Settings → Workflows → External request allowlist → + Add entry**
+
+| Field | Value |
+|---|---|
+| **URL pattern** | `https://gitlab.com` |
+| **Description** *(optional)* | `GitLab API — rollback pipeline trigger` |
+
+Click **Save changes**. The allowlist applies tenant-wide; any Workflow can now reach `gitlab.com` through the outbound connector.
+
+!!! warning "Missing allowlist entry = silent action failure"
+    If `gitlab.com` is not allowlisted, the GitLab action silently fails with a connectivity error instead of surfacing a clear message. If Action 3 completes without a corresponding GitLab pipeline appearing, check **Settings → Workflows → External request allowlist** first.
+
+---
+
+Now add the action itself.
+
+Add a **GitLab — Trigger a new pipeline** action (search for "GitLab" in the action picker — it appears under the GitLab connector):
 
 | Field | Value |
 |---|---|
 | **Label** | `Trigger GitLab rollback pipeline` |
 | **Run condition** | `{{ result("Run SRG evaluation").executionStatus == "FAIL" }}` |
-| **Method** | `POST` |
-| **URL** | `https://gitlab.com/api/v4/projects/YOUR_PROJECT_ID/trigger/pipeline` |
-| **Content-Type** | `application/x-www-form-urlencoded` |
+| **Connection** | `GitLab kkm-pulse-demo` |
+| **Project** | select `kkm-pulse-demo` (or enter the project path `your-group/kkm-pulse-demo`) |
+| **Ref** | `main` |
 
-Body (form-encoded):
+Under **Variables**, add three entries:
 
-```
-token={{ vault.GITLAB_TRIGGER_TOKEN }}&ref=main&variables[ROLLBACK]=true&variables[ROLLBACK_REASON]=Dynatrace SRG FAIL&variables[ROLLBACK_EVAL_ID]={{ result("Run SRG evaluation").evaluationId }}
-```
+| Key | Value |
+|---|---|
+| `ROLLBACK` | `true` |
+| `ROLLBACK_REASON` | `Dynatrace SRG FAIL` |
+| `ROLLBACK_EVAL_ID` | `{{ result("Run SRG evaluation").evaluationId }}` |
+
+!!! info "Why the GitLab connector action over HTTP Request"
+    The native GitLab action uses the pre-configured connection for authentication — no manual token passing, no form-encoded body to construct, and no project ID to look up. Variables are set as structured key-value pairs and injected by GitLab the same way as with the trigger API. The Workflow stays readable and the credential is managed centrally in the connection settings.
 
 **Action 4 (optional) — Send notification**: chain a Slack or email notification so on-call is alerted the moment the Workflow fires.
 
@@ -293,7 +368,7 @@ This closes the **deploy → observe → act** loop entirely within Dynatrace an
 | SRG evaluates real production traffic | Error rate, response time, and security vulnerabilities measured against defined objectives |
 | Security vulnerability as a quality gate | SRG objective counts critical CVEs — a deployment with unresolved critical vulnerabilities fails the gate |
 | Proactive rollback for post-pipeline issues | Workflow fires on SRG FAIL → calls GitLab trigger API → `rollback-prod` job runs |
-| Secure credential handling | GitLab trigger token stored in Dynatrace Vault, never exposed in logs or Workflow YAML |
+| Secure credential handling | GitLab PAT stored in a Dynatrace Connection, never exposed in logs or Workflow definitions — the native GitLab action references the connection by name |
 | Full observability of the rollback itself | `rollback-prod` sends a `CUSTOM_DEPLOYMENT` event back to Dynatrace with the SRG evaluation ID — rollback is visible on the service timeline and cross-linked to the evaluation that caused it |
 
 ---

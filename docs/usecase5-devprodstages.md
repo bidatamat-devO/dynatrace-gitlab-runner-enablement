@@ -138,7 +138,10 @@ git push
 Introduce an **intermittent failure** — the kind that slips past unit tests because tests only hit the endpoint once, but that load testing catches instantly. Edit `server.js`'s `/api/status` handler:
 
 ```js
+let hits = 0;
 app.get('/api/status', (req, res) => {
+  hits++;
+  if (hits > 5) {
     if (Math.random() < 0.5) {
         res.status(500).json({ error: "intermittent failure — simulated for the workshop" });
     } else {
@@ -151,6 +154,16 @@ app.get('/api/status', (req, res) => {
             timestamp: new Date().toISOString()
         });
     }
+  else {
+    res.json({
+        hospital: "Hospital Kuala Lumpur (Demo)",
+        status: "Normal Operations 🟢",
+        activePatients: Math.floor(Math.random() * 50) + 120,
+        averageWaitTimeMinutes: Math.floor(Math.random() * 15) + 10,
+        staffMood: "Caffeinated & Ready ☕",
+        timestamp: new Date().toISOString()
+    });
+  }  
 });
 ```
 
