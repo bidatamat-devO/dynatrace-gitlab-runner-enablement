@@ -53,6 +53,8 @@ In the `kkm-pulse-demo` project: **Settings → CI/CD → Variables → Add vari
 
 The Environment API v2 [events/ingest](https://docs.dynatrace.com/docs/shortlink/api-events-v2-post-event) endpoint takes a `CUSTOM_DEPLOYMENT` event. `DT_ENVIRONMENT` is the `.apps.` SSO URL; the ingest API lives on the `.live.` host, so we rewrite it inline.
 
+The richer the event payload, the more context Davis AI has when it correlates a problem to a deployment. The job below populates the standard Dynatrace deployment fields **plus** a set of traceability properties drawn straight from GitLab CI predefined variables — no extra scripting needed.
+
 ```yaml title=".gitlab-ci.yaml (append)" linenums="1"
 notify-dynatrace-deploy:
   stage: deploy_dev
@@ -62,14 +64,58 @@ notify-dynatrace-deploy:
     - deploy-dev
   script:
     - DT_TENANT=$(echo "$DT_ENVIRONMENT" | sed -E 's/\.apps\./.live./; s#/$##')
-    - >
-      curl -sf -X POST "${DT_TENANT}/api/v2/events/ingest"
-      -H "Authorization: Api-Token ${DT_INGEST_TOKEN}"
-      -H "Content-Type: application/json"
-      -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo deployed to dev\",\"entitySelector\":\"type(SERVICE),tag(k8s.namespace.name:kkm-pulse-dev)\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"version\":\"${CI_COMMIT_SHORT_SHA}\",\"environment\":\"dev\"}}"
+    - |
+      PAYLOAD=$(cat <<EOF
+      {
+        "eventType": "CUSTOM_DEPLOYMENT",
+        "title": "kkm-pulse-demo deployed to dev",
+        "entitySelector": "type(SERVICE),tag(k8s.namespace.name:kkm-pulse-dev)",
+        "properties": {
+          "dt.event.deployment.name":    "kkm-pulse-demo",
+          "deploymentVersion":           "${CI_COMMIT_SHORT_SHA}",
+          "source":                      "GitLab CI",
+          "ciBackLink":                  "${CI_JOB_URL}",
+          "GitLabUrl":                   "${CI_PROJECT_URL}",
+          "GitCommit":                   "${CI_COMMIT_SHA}",
+          "Owner":                       "platform-team",
+          "Approval":                    "${GITLAB_USER_NAME}",
+          "environment":                 "dev",
+          "branch":                      "${CI_COMMIT_REF_NAME}",
+          "commitAuthor":                "${CI_COMMIT_AUTHOR}",
+          "pipelineUrl":                 "${CI_PIPELINE_URL}",
+          "projectName":                 "${CI_PROJECT_NAME}",
+          "runnerTags":                  "${CI_RUNNER_TAGS}"
+        }
+      }
+      EOF
+      )
+      curl -sf -X POST "${DT_TENANT}/api/v2/events/ingest" \
+        -H "Authorization: Api-Token ${DT_INGEST_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$PAYLOAD"
 ```
 
-Push, run the pipeline, then in Dynatrace open **Notifications & alerting → Events** (or search `deployment.name:kkm-pulse-demo` in the events feed) to see it land — deployment events also draw a marker line on the process's timeline charts.
+### What each property does
+
+| Property | GitLab variable | Purpose |
+|---|---|---|
+| `deploymentVersion` | `CI_COMMIT_SHORT_SHA` | Identifies the exact build artifact deployed; shows up on the Dynatrace deployment marker tooltip |
+| `source` | _(literal)_ | Labels the event origin in the events feed — useful when events arrive from multiple tools |
+| `ciBackLink` | `CI_JOB_URL` | Clickable deep-link from the Dynatrace event directly to the GitLab job log |
+| `GitLabUrl` | `CI_PROJECT_URL` | Project home — lets SREs navigate to the repo from a Dynatrace problem card |
+| `GitCommit` | `CI_COMMIT_SHA` | Full 40-character SHA — unambiguous reference for `git bisect` or release audits |
+| `Owner` | _(literal)_ | Team responsible for this service; drives alert routing and runbook assignment |
+| `Approval` | `GITLAB_USER_NAME` | GitLab username of the person who triggered the pipeline — the human "approved" this push |
+| `branch` | `CI_COMMIT_REF_NAME` | Branch that was deployed; helps distinguish feature-branch deploys from `main` |
+| `commitAuthor` | `CI_COMMIT_AUTHOR` | Name + email of the commit author (may differ from the pipeline triggerer) |
+| `pipelineUrl` | `CI_PIPELINE_URL` | Link to the full pipeline run — broader context than a single job URL |
+| `projectName` | `CI_PROJECT_NAME` | Repository name — useful in multi-project Dynatrace dashboards |
+| `runnerTags` | `CI_RUNNER_TAGS` | Which runner pool executed the job — handy for infra-level problem correlation |
+
+!!! tip "Adding a variable for `Owner`"
+    Hard-coding `platform-team` works for a workshop, but in production you'd store it as a GitLab CI/CD variable (`DT_OWNER`) so different projects can declare different owners without touching the pipeline template.
+
+Push, run the pipeline, then in Dynatrace open **Notifications & alerting → Events** (or search `deployment.name:kkm-pulse-demo` in the events feed) to see it land — deployment events also draw a marker line on the process's timeline charts. Click the marker to expand the full property list you just sent.
 
 ---
 

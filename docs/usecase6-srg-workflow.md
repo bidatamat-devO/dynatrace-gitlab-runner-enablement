@@ -4,14 +4,15 @@
 
 The pipeline now deploys to production with a human approval gate and a load-test quality check. But what happens *after* the deployment completes? Even when pre-deployment gates pass, real production traffic can reveal issues — elevated latency, higher error rates, or newly-detected security vulnerabilities — that only emerge under genuine load.
 
-**Site Reliability Guardian (SRG)** is Dynatrace's automated post-deployment validation engine. It evaluates a deployment against a set of objectives anchored to real observability data — including security posture — and returns a binary **PASS / FAIL** verdict your pipeline can act on. And if production problems surface *after* the pipeline has already finished, a **Dynatrace Workflow** can call the GitLab API to trigger a rollback automatically.
+**Site Reliability Guardian (SRG)** is Dynatrace's automated post-deployment validation engine. It evaluates a deployment against a set of objectives anchored to real observability data — including security posture — and returns a binary **PASS / FAIL** verdict. A **Dynatrace Workflow** triggers that evaluation automatically on every deployment event and, if production fails its objectives, calls the GitLab API to kick off a rollback pipeline — no human in the loop.
 
 In this use case you will:
 
 1. Create a Guardian in Dynatrace and define objectives — error rate, response time, and critical security vulnerabilities
-2. Trigger an SRG evaluation from the pipeline after every production deployment
-3. Fail the pipeline if production does not meet its objectives
-4. Build a Dynatrace Workflow that calls back the GitLab pipeline to trigger a rollback if Dynatrace detects a problem in production after the pipeline has finished
+2. Build a Dynatrace Workflow that evaluates the Guardian automatically after every production deployment
+3. Test the PASS and FAIL paths
+4. Extend the Workflow to call the GitLab API and trigger a rollback when the evaluation fails
+5. Add a rollback job to the pipeline that runs only when Dynatrace fires
 
 ---
 
@@ -25,15 +26,14 @@ On the **Getting started with template** popup, click **Run Query**, select **kk
 
 ### Define objectives
 
-Click **Add More objective** for each of the three below.
+Click **Add More objective** for each of the two below.
 
-#### Objective 4 — P95 Response Time
+#### Objective 4 — Average CPU Usage
 
 | Field | Value |
 |---|---|
 | **Name** | `Average CPU usage` |
-| **DQL** | `timeseries val = avg(dt.kubernetes.container.cpu_usage, default: 0), filter: in(dt.smartscape.k8s_namespace, { toSmartscapeId("<<NAMESPACE_ID_TO_REPLACE>>>") })
-| fields avg = arrayAvg(val)` |
+| **DQL** | `timeseries val = avg(dt.kubernetes.container.cpu_usage, default: 0), filter: in(dt.smartscape.k8s_namespace, { toSmartscapeId("<<NAMESPACE_ID_TO_REPLACE>>>") }) | fields avg = arrayAvg(val)` |
 | **Fails if result** | `> 50` |
 | **Warning if result** | `> 40` |
 
@@ -42,26 +42,7 @@ Click **Add More objective** for each of the three below.
 | Field | Value |
 |---|---|
 | **Name** | `Critical Vulnerabilities` |
-| **DQL** | `fetch security.events
-| filter event.provider=="Dynatrace"
-| filter event.kind=="SECURITY_EVENT"
-| filter event.type=="VULNERABILITY_STATE_REPORT_EVENT"
-| filter event.level=="ENTITY"
-| fieldsAdd matcher="match"
-| lookup [
-fetch security.events
-| filter event.provider=="Dynatrace"
-| filter event.kind=="SECURITY_EVENT"
-| filter event.type=="VULNERABILITY_STATE_REPORT_EVENT"
-| filter event.level=="ENTITY"
-| fields maxTimestamp=timestamp, matcher="match"
-| limit 1
-], sourceField:matcher, lookupField:matcher, fields:{maxTimestamp}
-| filter timestamp==maxTimestamp
-| filter event.status=="OPEN"
-| filter in(vulnerability.risk.level,{"CRITICAL","HIGH"})
-| filter in(affected_entity.id, {"PROCESS_GROUP-A085A3959D385BE8"})
-| summarize Filtered_high-profile_vulnerabilities=arraySize(collectDistinct(vulnerability.id))` |
+| **DQL** | `fetch security.events | filter event.provider=="Dynatrace" | filter event.kind=="SECURITY_EVENT" | filter event.type=="VULNERABILITY_STATE_REPORT_EVENT" | filter event.level=="ENTITY" | fieldsAdd matcher="match" | lookup [ fetch security.events | filter event.provider=="Dynatrace" | filter event.kind=="SECURITY_EVENT" | filter event.type=="VULNERABILITY_STATE_REPORT_EVENT" | filter event.level=="ENTITY" | fields maxTimestamp=timestamp, matcher="match" | limit 1 ], sourceField:matcher, lookupField:matcher, fields:{maxTimestamp} | filter timestamp==maxTimestamp | filter event.status=="OPEN" | filter in(vulnerability.risk.level,{"CRITICAL","HIGH"}) | filter in(affected_entity.id, {"PROCESS_GROUP-A085A3959D385BE8"}) | summarize Filtered_high-profile_vulnerabilities=arraySize(collectDistinct(vulnerability.id))` |
 | **Fails criterion** | `> 0` |
 
 !!! info "Application Security required"
@@ -71,15 +52,15 @@ Save the Guardian. Note the **Guardian ID** from the URL — it looks like `guar
 
 ---
 
-## 2. Create a Platform API token
+## 2. Create credentials
 
-SRG's evaluation API uses a **Platform token** (not the classic ingest token from Use Case 4). In Dynatrace:
+### Platform token (for Workflow to trigger SRG)
 
-**Settings → Access tokens → Generate new token**
+In Dynatrace: **Settings → Access tokens → Generate new token**
 
 | Field | Value |
 |---|---|
-| **Name** | `kkm-pulse-demo SRG pipeline` |
+| **Name** | `kkm-pulse-demo SRG workflow` |
 | **Scopes** | `Davis data: Read` · `Site Reliability Guardian: Read evaluations` · `Site Reliability Guardian: Write evaluations` |
 
 In the `kkm-pulse-demo` GitLab project, add two CI/CD variables:
@@ -89,107 +70,7 @@ In the `kkm-pulse-demo` GitLab project, add two CI/CD variables:
 | `DT_PLATFORM_TOKEN` | the token you just generated | Yes |
 | `SRG_GUARDIAN_ID` | your guardian ID (e.g., `guardian-XXXXXXXXXXXXXXXX`) | No |
 
----
-
-## 3. Trigger SRG evaluation from the pipeline
-
-Add an `srg_validate` stage after `deploy_prod`. The job waits two minutes for post-deployment metrics to stabilize, triggers the evaluation, polls until it completes, then fails the job — and therefore blocks any downstream work — if the result is not `PASS`.
-
-```yaml title=".gitlab-ci.yaml (append)" linenums="1"
-stages:
-  - build
-  - test
-  - code_quality
-  - package
-  - deploy_dev
-  - load_test
-  - deploy_prod
-  - srg_validate
-
-srg-evaluate-prod:
-  stage: srg_validate
-  tags:
-    - shell
-  needs:
-    - notify-dynatrace-prod-deploy
-  script:
-    - echo "Waiting 120s for post-deployment metrics to stabilize..."
-    - sleep 120
-    - |
-      EVAL_RESPONSE=$(curl -sf -X POST "${DT_ENVIRONMENT}/api/v2/site-reliability-guardian/evaluations" \
-        -H "Authorization: Api-Token ${DT_PLATFORM_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d "{
-          \"guardianId\": \"${SRG_GUARDIAN_ID}\",
-          \"timeframeFrom\": \"now-3m\",
-          \"timeframeTo\": \"now\"
-        }")
-      EVAL_ID=$(echo "$EVAL_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['evaluationId'])")
-      echo "SRG evaluation triggered: $EVAL_ID"
-      echo "SRG_EVAL_ID=$EVAL_ID" >> srg.env
-    - |
-      STATUS="RUNNING"
-      ATTEMPTS=0
-      MAX_ATTEMPTS=30
-      while [ "$STATUS" = "RUNNING" ] && [ "$ATTEMPTS" -lt "$MAX_ATTEMPTS" ]; do
-        sleep 10
-        RESULT=$(curl -sf "${DT_ENVIRONMENT}/api/v2/site-reliability-guardian/evaluations/${EVAL_ID}" \
-          -H "Authorization: Api-Token ${DT_PLATFORM_TOKEN}")
-        STATUS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
-        echo "Attempt $((ATTEMPTS+1))/$MAX_ATTEMPTS — SRG status: $STATUS"
-        ATTEMPTS=$((ATTEMPTS + 1))
-      done
-      echo "SRG_STATUS=$STATUS" >> srg.env
-      if [ "$STATUS" != "PASS" ]; then
-        echo "ERROR: SRG evaluation returned '$STATUS'."
-        echo "One or more production objectives were not met — check Site Reliability Guardian in Dynatrace for per-objective detail."
-        exit 1
-      fi
-      echo "SRG PASSED — all reliability and security objectives met."
-  artifacts:
-    reports:
-      dotenv: srg.env
-```
-
-```bash
-git add .gitlab-ci.yaml
-git commit -m "ci: add SRG post-deployment validation gate"
-git push
-```
-
-Deploy to production (approve the Use Case 5 manual gate if you haven't already), then watch `srg-evaluate-prod` poll Dynatrace every 10 seconds. In Dynatrace, open **Site Reliability Guardian → kkm-pulse-demo production** and watch the evaluation populate in real time.
-
----
-
-## 4. See PASS and FAIL in action
-
-### A passing evaluation
-
-With a clean deployment and no anomalies running, all three objectives should be green and `srg-evaluate-prod` reports `SRG PASSED`.
-
-### Force a failing evaluation
-
-Spike the application while the evaluation window is open:
-
-```bash
-for i in $(seq 1 8); do
-  curl -H "Host: kkm-pulse-prod.127.0.0.1.sslip.io" http://localhost/api/trigger-anomaly &
-done
-wait
-```
-
-Wait for the next pipeline run's `srg-evaluate-prod` job (or re-trigger manually). The P95 latency objective will breach its threshold during the anomaly window, the SRG returns `FAIL`, and the job exits non-zero. No downstream jobs run.
-
-!!! tip "SRG vs. the load test"
-    The load test in Use Case 4 measures what *your curl loop* observed — a synthetic sample under controlled conditions. SRG evaluates metrics Dynatrace collected from *real application traffic* during the evaluation window. These are complementary gates: the load test catches obvious breakage early; SRG catches subtle performance regressions that only appear under concurrent production load.
-
----
-
-## 5. Build a Dynatrace Workflow for automated rollback
-
-SRG stops the current pipeline run when validation fails. But what if production degrades *after* the pipeline has already finished — say, an hour after deployment when peak traffic arrives? A Dynatrace **Workflow** can watch for production problems and automatically call the GitLab API to trigger a rollback pipeline.
-
-### Step 1 — Create a GitLab pipeline trigger token
+### GitLab pipeline trigger token (for Workflow to call rollback)
 
 In the `kkm-pulse-demo` GitLab project: **Settings → CI/CD → Pipeline triggers → Add new trigger**
 
@@ -199,7 +80,7 @@ Name it `Dynatrace rollback` and copy:
 
 Note your numeric **project ID** from the URL — you need it below.
 
-### Step 2 — Store the token in Dynatrace Vault
+### Store the GitLab token in Dynatrace Vault
 
 In Dynatrace: **Settings → Credentials Vault → Add credential**
 
@@ -211,41 +92,126 @@ In Dynatrace: **Settings → Credentials Vault → Add credential**
 
 Vault credentials are encrypted at rest and referenced in Workflows as `{{ vault.GITLAB_TRIGGER_TOKEN }}` — they never appear in plain text in logs or Workflow definitions.
 
-### Step 3 — Create the Workflow
+---
+
+## 3. Create a Workflow to evaluate SRG after deployment
+
+The pipeline's `notify-dynatrace-prod-deploy` job already sends a `CUSTOM_DEPLOYMENT` event to Dynatrace every time a production deployment completes. You will now create a Workflow that listens for that event and runs an SRG evaluation automatically — no pipeline polling required.
 
 In Dynatrace: **Apps → Workflows → + New Workflow**
 
-**Trigger** — set to **Event-based**:
+### Trigger — Event-based
 
 | Field | Value |
 |---|---|
-| **Event type** | `Site Reliability Guardian evaluation completed` |
-| **Filter condition** | `event.status == "FAIL" AND event.guardian.name == "kkm-pulse-demo production"` |
+| **Event type** | `Custom deployment event` |
+| **Filter condition** | `event.name == "kkm-pulse-demo" AND event.deployment.environment == "prod"` |
 
-!!! tip "Catching Davis AI problems too"
-    Add a second trigger for **Davis Problem** events filtered by entity `kkm-pulse-demo`. This catches issues Davis detects independently of SRG — for example, a memory leak that only becomes visible two hours after deployment.
+This fires once for every deployment the `notify-dynatrace-prod-deploy` job sends.
 
-**Action 1 — HTTP Request** (call GitLab to trigger rollback):
+### Action 1 — Wait for metrics to stabilize
+
+Add a **JavaScript** action and paste:
+
+```js
+import { execution } from "@dynatrace-sdk/automation-utils";
+
+export default async function () {
+  // Allow 120 s for post-deployment metrics to propagate
+  await new Promise(r => setTimeout(r, 120_000));
+  return { waited: true };
+}
+```
+
+| Field | Value |
+|---|---|
+| **Label** | `Wait for metrics to stabilize` |
+
+### Action 2 — Trigger SRG evaluation
+
+Add a **Site Reliability Guardian — Run evaluation** action (search for it in the action picker).
+
+| Field | Value |
+|---|---|
+| **Label** | `Run SRG evaluation` |
+| **Guardian** | select `kkm-pulse-demo production` |
+| **Timeframe from** | `now-3m` |
+| **Timeframe to** | `now` |
+
+The action completes when the evaluation finishes and exposes the result as `{{ result("Run SRG evaluation").executionStatus }}`.
+
+!!! tip "What does the result look like?"
+    The SRG action output includes `executionStatus` (`PASS` or `FAIL`), `totalScore`, and a per-objective breakdown. You can inspect it in **Workflow executions → select a run → Action 2 → Output**.
+
+Save and **activate** the Workflow.
+
+### Test the first step
+
+Push a trivial commit to trigger the pipeline through to production, approve the Use Case 5 manual gate, and let `notify-dynatrace-prod-deploy` run.
+
+In Dynatrace: **Apps → Workflows → kkm-pulse-demo SRG → Executions** — a new execution should appear within seconds. After ~2 minutes wait plus evaluation time, the execution completes. Open it and check:
+
+- Action 1 output: `{ "waited": true }`
+- Action 2 output: `executionStatus` is `PASS` (if production is healthy)
+
+In **Apps → Site Reliability Guardian → kkm-pulse-demo production** you can see the evaluation listed with its per-objective results.
+
+---
+
+## 4. Force a failing evaluation
+
+Spike the application while an evaluation is running to see the `FAIL` path:
+
+```bash
+for i in $(seq 1 8); do
+  curl -H "Host: kkm-pulse-prod.127.0.0.1.sslip.io" http://localhost/api/trigger-anomaly &
+done
+wait
+```
+
+Trigger another pipeline run (or re-run the Workflow manually). The latency objective will breach its threshold; the SRG returns `FAIL`; Action 2 output shows `executionStatus: FAIL`.
+
+!!! tip "SRG vs. the load test"
+    The load test in Use Case 4 measures what *your curl loop* observed — a synthetic sample under controlled conditions. SRG evaluates metrics Dynatrace collected from *real application traffic* during the evaluation window. These are complementary gates: the load test catches obvious breakage early; SRG catches subtle regressions that only appear under concurrent production load.
+
+---
+
+## 5. Extend the Workflow to trigger a GitLab rollback
+
+With the evaluation result available, add a conditional action that calls the GitLab trigger API only when SRG fails.
+
+Open the Workflow in edit mode and add **Action 3**.
+
+### Action 3 — Trigger GitLab rollback (conditional)
+
+Add an **HTTP Request** action:
 
 | Field | Value |
 |---|---|
 | **Label** | `Trigger GitLab rollback pipeline` |
+| **Run condition** | `{{ result("Run SRG evaluation").executionStatus == "FAIL" }}` |
 | **Method** | `POST` |
 | **URL** | `https://gitlab.com/api/v4/projects/YOUR_PROJECT_ID/trigger/pipeline` |
 | **Content-Type** | `application/x-www-form-urlencoded` |
 
 Body (form-encoded):
+
 ```
-token={{ vault.GITLAB_TRIGGER_TOKEN }}&ref=main&variables[ROLLBACK]=true&variables[ROLLBACK_REASON]=Dynatrace SRG FAIL
+token={{ vault.GITLAB_TRIGGER_TOKEN }}&ref=main&variables[ROLLBACK]=true&variables[ROLLBACK_REASON]=Dynatrace SRG FAIL&variables[ROLLBACK_EVAL_ID]={{ result("Run SRG evaluation").evaluationId }}
 ```
 
-**Action 2 — Send notification** (optional): chain a Slack or email notification so on-call is alerted the moment the Workflow fires.
+**Action 4 (optional) — Send notification**: chain a Slack or email notification so on-call is alerted the moment the Workflow fires.
 
-Save and **activate** the Workflow.
+Save and re-activate the Workflow.
 
-### Step 4 — Add a rollback job to the pipeline
+!!! tip "Catching Davis AI problems too"
+    Add a second event trigger for **Davis Problem** events filtered by entity `kkm-pulse-demo`. This catches issues Davis detects independently of SRG — for example, a memory leak that only becomes visible two hours after deployment — and calls the same rollback action.
 
-The rollback pipeline is triggered by the `ROLLBACK=true` variable injected by the Workflow. Add a conditional job that only runs when Dynatrace fires:
+---
+
+## 6. Add a rollback job to the pipeline
+
+The Workflow injects `ROLLBACK=true`, `ROLLBACK_REASON`, and `ROLLBACK_EVAL_ID` as pipeline variables when it calls the GitLab trigger API. Add a conditional job that only runs when Dynatrace fires:
 
 ```yaml title=".gitlab-ci.yaml (append)" linenums="1"
 stages:
@@ -256,7 +222,6 @@ stages:
   - deploy_dev
   - load_test
   - deploy_prod
-  - srg_validate
   - rollback
 
 rollback-prod:
@@ -266,7 +231,7 @@ rollback-prod:
   rules:
     - if: '$ROLLBACK == "true"'
   script:
-    - echo "Rollback triggered by Dynatrace — reason: ${ROLLBACK_REASON}"
+    - echo "Rollback triggered by Dynatrace — reason: ${ROLLBACK_REASON} (eval ${ROLLBACK_EVAL_ID})"
     - echo "Rolling back kkm-pulse-prod to previous ReplicaSet..."
     - kubectl rollout undo deployment/kkm-pulse-demo -n kkm-pulse-prod
     - kubectl rollout status deployment/kkm-pulse-demo -n kkm-pulse-prod --timeout=120s
@@ -277,7 +242,7 @@ rollback-prod:
       curl -sf -X POST "${DT_TENANT}/api/v2/events/ingest"
       -H "Authorization: Api-Token ${DT_INGEST_TOKEN}"
       -H "Content-Type: application/json"
-      -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo ROLLBACK triggered by Dynatrace\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"environment\":\"prod\",\"reason\":\"${ROLLBACK_REASON}\",\"triggered_by\":\"Dynatrace Workflow\"}}"
+      -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo ROLLBACK triggered by Dynatrace\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"environment\":\"prod\",\"reason\":\"${ROLLBACK_REASON}\",\"triggered_by\":\"Dynatrace Workflow\",\"srg_evaluation_id\":\"${ROLLBACK_EVAL_ID}\"}}"
 ```
 
 ```bash
@@ -290,11 +255,13 @@ Normal pipeline runs skip `rollback-prod` entirely because `$ROLLBACK` is unset.
 
 ---
 
-## 6. Test the end-to-end loop
+## 7. Test the end-to-end loop
 
-1. **Deploy to production** (push a change, run through the pipeline, approve the manual gate in Use Case 5, let `srg-evaluate-prod` pass)
+1. **Deploy to production** — push a change, run through the pipeline, approve the manual gate, let `notify-dynatrace-prod-deploy` complete
 
-2. **Simulate a sustained anomaly** in production after the pipeline finishes:
+2. **Watch the Workflow fire** — in **Apps → Workflows → kkm-pulse-demo SRG → Executions**, a new execution starts within seconds
+
+3. **Simulate a sustained anomaly** after the pipeline finishes:
     ```bash
     for i in $(seq 1 15); do
       curl -H "Host: kkm-pulse-prod.127.0.0.1.sslip.io" http://localhost/api/trigger-anomaly &
@@ -302,11 +269,9 @@ Normal pipeline runs skip `rollback-prod` entirely because `$ROLLBACK` is unset.
     wait
     ```
 
-3. **Watch Dynatrace → Problems** — Davis AI surfaces a CPU saturation problem for `kkm-pulse-demo`
+4. **Re-trigger the Workflow manually** (or wait for the next deployment). After the SRG evaluation completes with `FAIL`, Action 3 fires.
 
-4. **Confirm the Workflow fires** — in **Apps → Workflows → kkm-pulse-demo rollback → Executions**, you should see a run start within a minute of the problem being detected
-
-5. **Watch GitLab** — **CI/CD → Pipelines** shows a new pipeline (branch: `main`, triggered by API) with only the `rollback-prod` job
+5. **Watch GitLab** — **CI/CD → Pipelines** shows a new pipeline (branch: `main`, triggered by API) with only the `rollback-prod` job.
 
 6. **Verify the rollback**:
     ```bash
@@ -314,7 +279,7 @@ Normal pipeline runs skip `rollback-prod` entirely because `$ROLLBACK` is unset.
     curl -H "Host: kkm-pulse-prod.127.0.0.1.sslip.io" http://localhost/api/status
     ```
 
-7. **See the rollback event in Dynatrace** — in the `kkm-pulse-demo` service timeline, the `CUSTOM_DEPLOYMENT` rollback event appears alongside the Davis problem — a complete audit trail with no manual steps.
+7. **See the rollback event in Dynatrace** — in the `kkm-pulse-demo` service timeline, the `CUSTOM_DEPLOYMENT` rollback event appears alongside the SRG evaluation. The `srg_evaluation_id` property links you directly to the evaluation that triggered it — a complete audit trail with no manual correlation.
 
 This closes the **deploy → observe → act** loop entirely within Dynatrace and GitLab, with no human intervention required.
 
@@ -324,20 +289,20 @@ This closes the **deploy → observe → act** loop entirely within Dynatrace an
 
 | Capability | Implementation |
 |---|---|
-| Automated post-deployment validation | SRG evaluates error rate, response time, and security vulnerabilities against defined objectives after every prod deployment |
-| Binary PASS/FAIL pipeline gate | `srg-evaluate-prod` exits non-zero on any SRG FAIL — downstream stages are blocked |
+| Automated post-deployment validation | Workflow triggers SRG evaluation on every `CUSTOM_DEPLOYMENT` event from the pipeline |
+| SRG evaluates real production traffic | Error rate, response time, and security vulnerabilities measured against defined objectives |
 | Security vulnerability as a quality gate | SRG objective counts critical CVEs — a deployment with unresolved critical vulnerabilities fails the gate |
-| Proactive rollback for post-pipeline issues | Dynatrace Workflow fires on SRG FAIL or Davis Problem → calls GitLab trigger API → `rollback-prod` job runs |
+| Proactive rollback for post-pipeline issues | Workflow fires on SRG FAIL → calls GitLab trigger API → `rollback-prod` job runs |
 | Secure credential handling | GitLab trigger token stored in Dynatrace Vault, never exposed in logs or Workflow YAML |
-| Full observability of the rollback itself | `rollback-prod` sends a `CUSTOM_DEPLOYMENT` event back to Dynatrace — the rollback is visible on the service timeline |
+| Full observability of the rollback itself | `rollback-prod` sends a `CUSTOM_DEPLOYMENT` event back to Dynatrace with the SRG evaluation ID — rollback is visible on the service timeline and cross-linked to the evaluation that caused it |
 
 ---
 
 ## Knowledge Check
 
-### Question 1 — Why does `srg-evaluate-prod` wait 120 seconds before triggering?
+### Question 1 — Why does the Workflow wait 120 seconds before triggering the SRG evaluation?
 
-The job begins with `sleep 120` before calling the SRG API. Explain what category of incorrect results becomes more likely if you remove this wait and trigger the evaluation immediately after deployment.
+The JavaScript action waits two minutes before the SRG evaluate action runs. Explain what category of incorrect results becomes more likely if you remove this wait.
 
 ??? question "Show Answer"
 
@@ -352,54 +317,47 @@ The job begins with `sleep 120` before calling the SRG API. Explain what categor
 
     **Why not wait even longer?**
 
-    A longer wait delays feedback and keeps the pipeline blocked. 120 seconds is a pragmatic balance: enough time for the application to reach steady state and for metrics to propagate through the Dynatrace ingest pipeline, but short enough that the feedback loop remains useful. In production, tune this to match your application's actual warm-up profile — some services need 30 seconds, others need 5 minutes.
+    A longer wait delays feedback. 120 seconds is a pragmatic balance: enough time for the application to reach steady state and for metrics to propagate through the Dynatrace ingest pipeline, but short enough that the feedback loop remains useful. In production, tune this to match your application's actual warm-up profile.
 
     **Rule of thumb:** set the wait to *at least* the time it takes for your application's error rate to stabilize after a cold start, plus 30–60 seconds for metric ingestion latency.
 
 ---
 
-### Question 2 — Hands-on: Surface the rollback reason in Dynatrace and GitLab logs
+### Question 2 — Hands-on: Add a Slack notification to the rollback Workflow
 
-The `rollback-prod` job already logs `${ROLLBACK_REASON}` to the console. Extend the end-to-end loop so that:
+The Workflow currently triggers a GitLab rollback but sends no human-readable alert. Extend **Action 4** (the optional notification step) so on-call receives a Slack message that includes:
 
-1. The Dynatrace Workflow passes the SRG evaluation ID as a third pipeline variable (`ROLLBACK_EVAL_ID`) alongside `ROLLBACK` and `ROLLBACK_REASON`
-2. `rollback-prod` includes `$ROLLBACK_EVAL_ID` in the `CUSTOM_DEPLOYMENT` event it sends back to Dynatrace so the rollback event is directly linked to the evaluation that triggered it
+1. Which Guardian evaluation failed (`{{ result("Run SRG evaluation").evaluationId }}`)
+2. The total score (`{{ result("Run SRG evaluation").totalScore }}`)
+3. A direct link to the evaluation in Dynatrace
 
-Show the changes needed in both the Workflow body and the pipeline job.
+Show the Workflow action configuration and the message template you would use.
 
 ??? question "Show Answer"
 
-    **Step 1 — Add `ROLLBACK_EVAL_ID` to the Workflow HTTP action body:**
+    Add a **Send Slack message** action (requires the Slack connector to be configured in your tenant):
 
-    In Dynatrace Workflows, the SRG evaluation event exposes the evaluation ID as `{{ event()['evaluationId'] }}`. Update the form-encoded body:
+    | Field | Value |
+    |---|---|
+    | **Label** | `Notify on-call of rollback` |
+    | **Run condition** | `{{ result("Run SRG evaluation").executionStatus == "FAIL" }}` |
+    | **Channel** | `#oncall-alerts` |
+
+    Message body:
 
     ```
-    token={{ vault.GITLAB_TRIGGER_TOKEN }}&ref=main&variables[ROLLBACK]=true&variables[ROLLBACK_REASON]=Dynatrace SRG FAIL&variables[ROLLBACK_EVAL_ID]={{ event()['evaluationId'] }}
+    :rotating_light: *kkm-pulse-demo production rollback triggered*
+
+    SRG evaluation `{{ result("Run SRG evaluation").evaluationId }}` returned *FAIL* (score: {{ result("Run SRG evaluation").totalScore }}).
+
+    GitLab rollback pipeline has been triggered automatically.
+
+    View evaluation: {{ your-tenant }}/ui/srg/evaluations/{{ result("Run SRG evaluation").evaluationId }}
     ```
 
-    **Step 2 — Include `ROLLBACK_EVAL_ID` in the `CUSTOM_DEPLOYMENT` event sent from `rollback-prod`:**
+    **Why this matters:**
 
-    Update the `curl` call at the end of the rollback job's `script:`:
-
-    ```yaml
-    - >
-      curl -sf -X POST "${DT_TENANT}/api/v2/events/ingest"
-      -H "Authorization: Api-Token ${DT_INGEST_TOKEN}"
-      -H "Content-Type: application/json"
-      -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo ROLLBACK triggered by Dynatrace\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"environment\":\"prod\",\"reason\":\"${ROLLBACK_REASON}\",\"triggered_by\":\"Dynatrace Workflow\",\"srg_evaluation_id\":\"${ROLLBACK_EVAL_ID}\"}}"
-    ```
-
-    **What this gives you:**
-
-    The `CUSTOM_DEPLOYMENT` rollback event now carries the `srg_evaluation_id` property. In Dynatrace's event feed you can click from the rollback event directly to the SRG evaluation detail — you'll see exactly which objectives failed, what the measured values were, and when the breach occurred. This closes the audit trail: deployment → SRG FAIL → rollback, all cross-linked without any manual correlation.
-
-    **Verify in the GitLab log:**
-
-    Add a log line to `rollback-prod` before the curl so the pipeline job output also records the link:
-
-    ```yaml
-    - echo "Rolling back due to SRG evaluation ${ROLLBACK_EVAL_ID}: ${ROLLBACK_REASON}"
-    ```
+    The Workflow handles the mechanical rollback without waking anyone up, but on-call still needs to know a rollback happened and why. The Slack message provides the evaluation link so they can go straight to the per-objective breakdown — no manual searching in Dynatrace.
 
 ---
 
@@ -412,7 +370,7 @@ Across six use cases you took `kkm-pulse-demo` from zero to a fully observable, 
 3. **Use Case 3** — Docker image built in CI, loaded into k3d, deployed and exposed on Kubernetes
 4. **Use Case 4** — Dynatrace OneAgent, deployment events, load test graded against an error budget
 5. **Use Case 5** — Separate dev/prod environments with a structural gate: a bad build can never reach the ▶️ button
-6. **Use Case 6** — SRG validates production against KPIs including security; Dynatrace Workflow triggers an automatic rollback when production degrades after the pipeline finishes
+6. **Use Case 6** — Dynatrace Workflow evaluates SRG on every deployment; triggers GitLab rollback automatically when production degrades
 
 <div class="grid cards" markdown>
 - [Continue to Cleanup :octicons-arrow-right-24:](cleanup.md)

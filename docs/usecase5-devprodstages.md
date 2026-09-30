@@ -170,6 +170,9 @@ Watch what happens:
 
 This is the key insight: the unit tests gave you a **false green**. The load test gate is what actually caught the regression before it reached production.
 
+> **Note — pipeline failed but not because of the intentional failure?**
+> If your pipeline fails at an unexpected stage (e.g. `deploy-dev` or `load-test` errors out before it even runs requests), it may be a **transient infrastructure error** rather than the simulated bug — things like a momentary runner hiccup, a Kubernetes scheduling delay, or a network blip during image pull. In that case, simply open the failed pipeline in GitLab and click **Retry** (the circular arrow button at the top of the pipeline view). The pipeline will resume from the failed job without needing a new commit.
+
 Check the events feed in Dynatrace — you'll see the dev `CUSTOM_DEPLOYMENT` and the `CUSTOM_INFO` load-test-result event with `error_rate_pct` around 50, but no production deployment event, because it never ran.
 
 Revert the change once you've seen it:
