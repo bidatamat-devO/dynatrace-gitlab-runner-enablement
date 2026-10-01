@@ -22,7 +22,11 @@ In Dynatrace, navigate to **Apps → Site Reliability Guardian** (search for it 
 
 Click **+ New Guardian**, then choose **Choose Template** and select **Four Golden Signals**.
 
+![Dynatrace Site Reliability Guardian — creating new Guardian with Four Golden Signals template](img/usecase6-srg-new-guardian.png)
+
 On the **Getting started with template** popup, click **Run Query**, select **kkm-pulse-demo**, and click **Apply Template**.
+
+![SRG Getting started popup — Run Query selecting kkm-pulse-demo service and Apply Template](img/usecase6-srg-apply-template.png)
 
 ### Configure the four golden signal objectives
 
@@ -60,6 +64,8 @@ The template pre-creates four objectives. Set the **Fails if result** and **Warn
 | **Fails if result** | `< 1` |
 | **Warning if result** | `< 5` |
 
+![SRG objectives — Latency, Saturation, Errors and Traffic thresholds configured](img/usecase6-srg-objectives.png)
+
 !!! info "Threshold units"
     Latency thresholds are in **milliseconds**. Saturation and Errors thresholds are in **percentage (%)** of requests or resource usage. Traffic is a **request-per-minute** floor — a value below this indicates the service is not receiving meaningful load and may have stalled.
 
@@ -76,6 +82,8 @@ Click **Add More objective** for each of the two below.
 | **Fails if result** | `> 50` |
 | **Warning if result** | `> 40` |
 
+![SRG custom objective — Average CPU usage DQL query and threshold configuration](img/usecase6-srg-cpu-objective.png)
+
 #### Objective 6 — Critical Security Vulnerabilities
 
 | Field | Value |
@@ -84,10 +92,14 @@ Click **Add More objective** for each of the two below.
 | **DQL** | `fetch security.events | filter event.provider=="Dynatrace" | filter event.kind=="SECURITY_EVENT" | filter event.type=="VULNERABILITY_STATE_REPORT_EVENT" | filter event.level=="ENTITY" | fieldsAdd matcher="match" | lookup [ fetch security.events | filter event.provider=="Dynatrace" | filter event.kind=="SECURITY_EVENT" | filter event.type=="VULNERABILITY_STATE_REPORT_EVENT" | filter event.level=="ENTITY" | fields maxTimestamp=timestamp, matcher="match" | limit 1 ], sourceField:matcher, lookupField:matcher, fields:{maxTimestamp} | filter timestamp==maxTimestamp | filter event.status=="OPEN" | filter in(vulnerability.risk.level,{"CRITICAL","HIGH"}) | filter in(affected_entity.id, {"PROCESS_GROUP-A085A3959D385BE8"}) | summarize Filtered_high-profile_vulnerabilities=arraySize(collectDistinct(vulnerability.id))` |
 | **Fails criterion** | `> 0` |
 
+![SRG custom objective — Critical Security Vulnerabilities DQL query with OPEN CRITICAL/HIGH filter](img/usecase6-srg-security-objective.png)
+
 !!! info "Application Security required"
     The security objective requires **Dynatrace Application Security** to be enabled. If it's unavailable on your tenant, skip this objective — the error rate and latency objectives are sufficient for the workshop. The principle (SRG can gate on security KPIs the same way it gates on performance KPIs) is the key takeaway.
 
 Save the Guardian. Note the **Guardian ID** from the URL — it looks like `guardian-XXXXXXXXXXXXXXXX`.
+
+![SRG Guardian saved — Guardian ID visible in the browser URL bar](img/usecase6-srg-guardian-id.png)
 
 ---
 
@@ -102,12 +114,16 @@ In Dynatrace: **Settings → Access tokens → Generate new token**
 | **Name** | `kkm-pulse-demo SRG workflow` |
 | **Scopes** | `Davis data: Read` · `Site Reliability Guardian: Read evaluations` · `Site Reliability Guardian: Write evaluations` |
 
+![Dynatrace Settings → Access tokens — generating SRG workflow token with required scopes](img/usecase6-dt-platform-token.png)
+
 In the `kkm-pulse-demo` GitLab project, add two CI/CD variables:
 
 | Key | Value | Mask? |
 |---|---|---|
 | `DT_PLATFORM_TOKEN` | the token you just generated | Yes |
 | `SRG_GUARDIAN_ID` | your guardian ID (e.g., `guardian-XXXXXXXXXXXXXXXX`) | No |
+
+![Adding DT_PLATFORM_TOKEN and SRG_GUARDIAN_ID as CI/CD variables in GitLab Settings → CI/CD → Variables](img/usecase6-gitlab-srg-vars.png)
 
 ### GitLab connection (for Workflow to trigger rollback pipeline)
 
@@ -120,6 +136,8 @@ In GitLab: **User icon → Edit profile → Access tokens → Add new token**
 | **Token name** | `Dynatrace Workflow rollback` |
 | **Scopes** | `api` |
 
+![GitLab User Settings → Access Tokens — creating Dynatrace Workflow rollback token with api scope](img/usecase6-gitlab-pat.png)
+
 Copy the generated token.
 
 In Dynatrace: **Apps → Connections → + New connection → GitLab**
@@ -130,7 +148,11 @@ In Dynatrace: **Apps → Connections → + New connection → GitLab**
 | **GitLab URL** | `https://gitlab.com` |
 | **Personal access token** | the token you just copied |
 
+![Dynatrace Apps → Connections — creating new GitLab connection with URL and Personal Access Token](img/usecase6-dt-gitlab-connection.png)
+
 Save the connection. It appears in the action picker as a selectable credential — the token is stored encrypted and never exposed in Workflow logs or definitions.
+
+![Dynatrace Connections showing GitLab kkm-pulse-demo entry as Connected](img/usecase6-dt-connection-saved.png)
 
 ---
 
@@ -148,6 +170,8 @@ In Dynatrace: **Apps → Workflows → + New Workflow**
 | **Filter condition** | `event.name == "kkm-pulse-demo" AND event.deployment.environment == "prod"` |
 
 This fires once for every deployment the `notify-dynatrace-prod-deploy` job sends.
+
+![Dynatrace Workflow trigger — Custom deployment event filter for kkm-pulse-demo production](img/usecase6-workflow-trigger.png)
 
 ### Action 1 — Wait for metrics to stabilize
 
@@ -167,6 +191,8 @@ export default async function () {
 |---|---|
 | **Label** | `Wait for metrics to stabilize` |
 
+![Dynatrace Workflow Action 1 — JavaScript wait action configured with 120-second delay](img/usecase6-workflow-action1.png)
+
 ### Action 2 — Trigger SRG evaluation
 
 Add a **Site Reliability Guardian — Run evaluation** action (search for it in the action picker).
@@ -179,6 +205,8 @@ Add a **Site Reliability Guardian — Run evaluation** action (search for it in 
 | **Timeframe to** | `now` |
 
 The action completes when the evaluation finishes and exposes the result as `{{ result("Run SRG evaluation").executionStatus }}`.
+
+![Dynatrace Workflow Action 2 — Site Reliability Guardian Run evaluation with timeframe now-3m to now](img/usecase6-workflow-action2.png)
 
 !!! tip "What does the result look like?"
     The SRG action output includes `executionStatus` (`PASS` or `FAIL`), `totalScore`, and a per-objective breakdown. You can inspect it in **Workflow executions → select a run → Action 2 → Output**.
@@ -234,6 +262,8 @@ The connection you created in Section 2 must be visible to Workflows. Confirm it
 
 If it is missing, re-create it following the steps in [Section 2 — GitLab connection](#2-create-credentials).
 
+![Dynatrace Apps → Connections showing GitLab kkm-pulse-demo with Status: Connected](img/usecase6-connection-status.png)
+
 #### Step B — Add GitLab to the external request allowlist
 
 Dynatrace Workflows block outbound HTTP calls to unlisted hosts by default. You must explicitly allowlist `gitlab.com` before the GitLab action can fire.
@@ -246,6 +276,8 @@ In Dynatrace: **Settings → Workflows → External request allowlist → + Add 
 | **Description** *(optional)* | `GitLab API — rollback pipeline trigger` |
 
 Click **Save changes**. The allowlist applies tenant-wide; any Workflow can now reach `gitlab.com` through the outbound connector.
+
+![Dynatrace Settings → Workflows → External request allowlist with gitlab.com entry added](img/usecase6-dt-allowlist.png)
 
 !!! warning "Missing allowlist entry = silent action failure"
     If `gitlab.com` is not allowlisted, the GitLab action silently fails with a connectivity error instead of surfacing a clear message. If Action 3 completes without a corresponding GitLab pipeline appearing, check **Settings → Workflows → External request allowlist** first.
@@ -271,6 +303,8 @@ Under **Variables**, add three entries:
 | `ROLLBACK` | `true` |
 | `ROLLBACK_REASON` | `Dynatrace SRG FAIL` |
 | `ROLLBACK_EVAL_ID` | `{{ result("Run SRG evaluation").evaluationId }}` |
+
+![Dynatrace Workflow Action 3 — GitLab Trigger a new pipeline action with ROLLBACK variables and run condition on SRG FAIL](img/usecase6-workflow-action3.png)
 
 !!! info "Why the GitLab connector action over HTTP Request"
     The native GitLab action uses the pre-configured connection for authentication — no manual token passing, no form-encoded body to construct, and no project ID to look up. Variables are set as structured key-value pairs and injected by GitLab the same way as with the trigger API. The Workflow stays readable and the credential is managed centrally in the connection settings.
@@ -447,6 +481,8 @@ Across six use cases you took `kkm-pulse-demo` from zero to a fully observable, 
 5. **Use Case 5** — Separate dev/prod environments with a structural gate: a bad build can never reach the ▶️ button
 6. **Use Case 6** — Dynatrace Workflow evaluates SRG on every deployment; triggers GitLab rollback automatically when production degrades
 
+Use Case 7 goes further: SRG moves upstream and blocks the merge itself — broken releases never reach `main`.
+
 <div class="grid cards" markdown>
-- [Continue to Cleanup :octicons-arrow-right-24:](cleanup.md)
+- [Continue to Use Case 7 — Blue-Green Deployment with SRG Pre-Merge Gate :octicons-arrow-right-24:](usecase7-blue-green-srg.md)
 </div>

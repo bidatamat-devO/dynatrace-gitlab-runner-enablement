@@ -57,6 +57,8 @@ cat ~/.ssh/id_ed25519.pub
 1. In GitLab, click your avatar → **Edit profile** → **SSH Keys** (or go directly to **User Settings → SSH Keys**)
 2. Click **Add new key**, paste the output above into **Key**, give it a title, change **Expiry Date** and click **Add key**
 
+![Adding SSH public key in GitLab User Settings → SSH Keys](img/usecase2-ssh-key-gitlab.png)
+
 ---
 
 ## 2. Create the project in GitLab and push
@@ -65,6 +67,8 @@ cat ~/.ssh/id_ed25519.pub
     1. On [gitlab.com](https://gitlab.com), click **Create new... → New project/repository → Create blank project**
     2. Project name: `kkm-pulse-demo`, **do not** initialize with a README (we're pushing existing history)
     3. Click **Create project** and copy the SSH clone URL, e.g. `git@gitlab.com:<your-username>/kkm-pulse-demo.git`
+
+![Creating blank project kkm-pulse-demo in GitLab](img/usecase2-create-project.png)
 
 From inside `.devcontainer/apps/kkm-pulse-demo` (it's already its own git repository):
 
@@ -84,7 +88,10 @@ git push --set-upstream origin main
 Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its own registration (the same `gitlab-runner` service from Use Case 1 can hold multiple registrations at once).
 
 1. In the `kkm-pulse-demo` project: **Settings → CI/CD → Runners → New project runner**
-2. Tags: `shell`, and Create the Runner 
+2. Tags: `shell`, and Create the Runner
+
+![Settings → CI/CD → Runners → New project runner for kkm-pulse-demo](img/usecase2-create-runner.png)
+
 3. Install the Gitlab Runner
 
   ```
@@ -102,7 +109,11 @@ Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its 
   sudo gitlab-runner start
   ```
 
-4. Copy and paste the steps number 1 or run below command with the valid `glrt-...` token
+4. Copy the one-time registration token shown after creating the runner
+
+![Copying the glrt- token for kkm-pulse-demo runner](img/usecase2-runner-token.png)
+
+   Then run below command with the valid `glrt-...` token
 
   ```bash
   sudo gitlab-runner register \
@@ -120,6 +131,8 @@ gitlab-runner run
 ```
 
 You will see the gitlab runner waiting for job to run on the terminal, you can validate from the Gitlab UI by clicking the View Runner
+
+![Runner showing online status in GitLab Settings → CI/CD → Runners](img/usecase2-runner-online.png)
 
 //TODO to validate and clean
 ### Give the runner access to Docker and the cluster
@@ -240,17 +253,29 @@ Port `9000` is already pre-declared in this Codespace (see `devcontainer.json`):
 3. Make the port into **Public**, to make the sonar accessible from gitlab
 4. Click the globe icon next to it to **Open in Browser**
 
+![Making port 9000 public in VS Code Ports panel](img/usecase2-sonar-port-public.png)
+
 Log in with **admin / admin** and set a new password when prompted.
+
+![SonarQube login page — first login with admin/admin](img/usecase2-sonar-login.png)
 
 
 ### Configure GitLab and Sonar Token
 
 1. In Sonar Home Page (Projects) Create your pavourite project from DevOps Platform, Click **Setup (Import from Gitlab) → Create Configuration**
 2. Under **Generate Tokens**, name it `kkm-pulse-demo`, type **Gitlab API URL**, paste the **Gitlab Personal Access Token**, and **Save Configuration**
+
+![SonarQube GitLab DevOps Platform configuration with API URL and Personal Access Token](img/usecase2-sonar-gitlab-config.png)
+
 3. Paste the **Gitlab Persona Access token** again to provide access to the repo
 4. On the Gitlab Project onboarding, select `kkm-pulse-demo → Follow the instance Default  → Analyze with Gitlab CI`
+
+![SonarQube project onboarding — selecting kkm-pulse-demo and Analyze with GitLab CI](img/usecase2-sonar-project-onboarding.png)
+
 2. Generate the token on step 1 **Generate Token**, name it `kkm-pulse-demo`, Select **Global Analysis Token**, click **Generate**
 3. Copy the token — it's shown only once
+
+![Generating a Global Analysis Token in SonarQube](img/usecase2-sonar-token-generate.png)
 
 
 ### Configure GitLab CI/CD variables
@@ -261,6 +286,8 @@ In the `kkm-pulse-demo` project: **Settings → CI/CD → Variables → Add vari
 |---|---|---|
 | `SONAR_HOST_URL` | `http://localhost:9000` (the runner and SonarQube share the same Codespace host) | No |
 | `SONAR_TOKEN` | the token you generated above | Yes |
+
+![Adding SONAR_HOST_URL and SONAR_TOKEN as CI/CD variables in GitLab Settings → CI/CD → Variables](img/usecase2-gitlab-sonar-vars.png)
 
 
 ### Install the SonarScanner CLI on the runner host
@@ -320,6 +347,8 @@ git push
 
 1. Watch `sonarqube-check` run in **CI/CD → Pipelines**
 2. Back in the SonarQube UI, open **Projects → kkm-pulse-demo** and confirm the analysis landed with a Quality Gate result
+
+![SonarQube Projects → kkm-pulse-demo showing Quality Gate result after pipeline analysis](img/usecase2-sonar-quality-gate.png)
 
 ---
 

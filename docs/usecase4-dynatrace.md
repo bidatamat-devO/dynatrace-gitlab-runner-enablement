@@ -33,6 +33,8 @@ curl -H "Host: kkm-pulse-dev.127.0.0.1.sslip.io" http://localhost/api/status
 
 In Dynatrace, go to **Applications & Microservices → Processes** (or search `kkm-pulse-demo`) — you should see a new Node.js process group appear within a couple of minutes.
 
+![Dynatrace Applications & Microservices → Processes showing kkm-pulse-demo Node.js process group](img/usecase4-dt-process-group.png)
+
 ---
 
 ## 2. Give the pipeline Dynatrace credentials
@@ -43,6 +45,8 @@ In the `kkm-pulse-demo` project: **Settings → CI/CD → Variables → Add vari
 |---|---|---|
 | `DT_ENVIRONMENT` | same value as your Codespace secret, e.g. `https://abc123.apps.dynatrace.com` | No |
 | `DT_INGEST_TOKEN` | same value as your Codespace secret | Yes |
+
+![Adding DT_ENVIRONMENT and DT_INGEST_TOKEN as CI/CD variables in GitLab Settings → CI/CD → Variables](img/usecase4-gitlab-dt-vars.png)
 
 !!! tip "Where do I find the values again?"
     They were provided as Codespaces secrets at launch. From the terminal: `echo $DT_ENVIRONMENT` (don't echo the token to a shared screen — copy it from wherever you originally stored it, or from GitHub's Codespaces secrets settings).
@@ -116,6 +120,8 @@ notify-dynatrace-deploy:
     Hard-coding `platform-team` works for a workshop, but in production you'd store it as a GitLab CI/CD variable (`DT_OWNER`) so different projects can declare different owners without touching the pipeline template.
 
 Push, run the pipeline, then in Dynatrace open **Notifications & alerting → Events** (or search `deployment.name:kkm-pulse-demo` in the events feed) to see it land — deployment events also draw a marker line on the process's timeline charts. Click the marker to expand the full property list you just sent.
+
+![Dynatrace Events feed showing CUSTOM_DEPLOYMENT event for kkm-pulse-demo with deployment properties](img/usecase4-dt-deployment-event.png)
 
 ---
 
@@ -205,6 +211,8 @@ for i in 1 2 3; do curl -H "Host: kkm-pulse-dev.127.0.0.1.sslip.io" http://local
 ```
 
 Open **Problems** in Dynatrace — Davis AI should surface a CPU saturation problem correlated to the `kkm-pulse-demo` process within a few minutes, alongside the deployment and load-test events you just pushed on the same timeline.
+
+![Dynatrace Problems showing Davis AI-detected CPU saturation anomaly correlated to kkm-pulse-demo](img/usecase4-dt-problem.png)
 
 ---
 

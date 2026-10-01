@@ -104,6 +104,9 @@ git push
 
 1. Push a normal change, watch the pipeline run through `load_test`
 2. In **CI/CD → Pipelines**, open the pipeline — `deploy-prod` appears in the graph with a ▶️ (manual) icon, available to click
+
+![GitLab pipeline showing deploy-prod stage with manual approval icon after load test passes](img/usecase5-manual-gate.png)
+
 3. Click it, then confirm `kkm-pulse-prod` is running and open it in your browser:
 
     ```bash
@@ -180,6 +183,8 @@ Watch what happens:
 - `load-test` drives hundreds of requests and records ~50% error rate — far above the 10% budget
 - `notify-dynatrace-test-result` fails the error-budget check and exits non-zero
 - `deploy_prod` never appears as an available stage — there is no ▶️ button to click
+
+![GitLab pipeline showing deploy_prod stage absent after load test gate failure](img/usecase5-gate-blocked.png)
 
 This is the key insight: the unit tests gave you a **false green**. The load test gate is what actually caught the regression before it reached production.
 

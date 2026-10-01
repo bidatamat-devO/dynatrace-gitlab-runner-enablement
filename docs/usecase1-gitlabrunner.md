@@ -54,7 +54,7 @@ deploy-job:
 ![Creating .gitlab-ci.yml in the GitLab web editor](img/usecase1-create-pipeline.png)
 
 !!! info "Nothing will run yet"
-    Open **CI/CD → Pipelines** in GitLab and you'll see the pipeline stuck **pending** — there is no runner registered against this project yet. That's what the rest of this use case fixes.
+    Open ** → Pipelines** in GitLab and you'll see the pipeline stuck **pending** — there is no runner registered against this project yet. That's what the rest of this use case fixes.
 
 ![Pipeline stuck in pending state — no runner registered](img/usecase1-pipeline-pending.png)
 
@@ -95,7 +95,7 @@ GitLab.com no longer uses the old shared "registration token" — you create the
 !!! example "Step-by-step — Copy the registration token"
     5. After clicking **Create runner**, GitLab shows a one-time registration command — copy the `--token glrt-...` value from it
 
-![Copy the glrt- token shown after creating the runner](img/usecase1-runner-token.png)
+![Registering the runner in the Codespace terminal](img/usecase1-runner-create.png)
 
 Register it non-interactively from the Codespace terminal:
 
@@ -108,27 +108,22 @@ sudo gitlab-runner register \
   --description "codespace-shell-runner"
 ```
 
-![Registering the runner in the Codespace terminal](img/usecase1-runner-register.png)
-
 Start the runner:
 
 ```bash
 gitlab-runner run
 ```
 
-Back in GitLab, **Settings → CI/CD → Runners** should now show your runner as **online** (green dot).
+![Registering the runner in the Codespace terminal](img/usecase1-runner-register.png)
 
-![Runner showing online status in GitLab Settings → CI/CD → Runners](img/usecase1-runner-online.png)
+
+Back in GitLab, **Settings → CI/CD → Runners** should now show your runner as **online** (green dot).
 
 ---
 
 ## 5. Watch the pipeline run
 
 Both `build-job` and `deploy-job` should turn green. Click into a job to see its log — you'll also see the runner picking up jobs in the Codespace terminal where `gitlab-runner run` is executing.
-
-![Pipeline with both jobs passing (green)](img/usecase1-pipeline-success.png)
-
-![Clicking into a job to inspect its log output](img/usecase1-job-logs.png)
 
 ---
 
@@ -179,9 +174,7 @@ deploy-job:
 ```
 
     3. Scroll down, enter a commit message such as `test: use wrong runner tag`, and click **Commit changes**
-    4. Navigate to **CI/CD → Pipelines** — the jobs should be **stuck pending** immediately
-
-![Editing .gitlab-ci.yml in the GitLab web editor and committing](img/usecase1-tags-edit-ui.png)
+    4. Navigate to **Build → Pipelines** — the jobs should be **stuck pending** immediately
 
 ![Pipeline jobs stuck in pending because no runner matches the k8s tag](img/usecase1-tags-pending.png)
 
@@ -219,8 +212,6 @@ deploy-job:
 
     3. Commit with message `fix: restore shell runner tag`
     4. **CI/CD → Pipelines** — the new pipeline should be picked up immediately and both jobs pass
-
-![Editing the tag back to shell in the GitLab web editor](img/usecase1-tags-fix-ui.png)
 
 ![Pipeline runs successfully after restoring the correct tag](img/usecase1-tags-success.png)
 
@@ -278,9 +269,6 @@ deploy-job:
     4. Merge the branch into `main` (or commit the same change directly on `main`)
     5. The next pipeline on `main` should run **both** jobs
 
-    ![deploy-job skipped on a feature branch](img/usecase1-bonus-rules.png)
-
-    ![deploy-job runs on the main branch](img/usecase1-bonus-branch-skip.png)
 
     **Why `rules:` instead of `only:`?**
     `rules:` is the modern replacement for the older `only:/except:` syntax. It evaluates conditions top-to-bottom and supports complex logic — multiple `if:`, `changes:`, and `exists:` conditions can be combined in one block. GitLab recommends `rules:` for all new pipelines.
