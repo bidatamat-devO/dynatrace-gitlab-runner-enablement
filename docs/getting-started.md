@@ -76,14 +76,16 @@ The Codespace pre-declares three forwarded ports:
 
 ## Part 3 — What You'll Build
 
-Across the six use cases you will:
+Across the eight use cases you will:
 
-1. Learn how pipeline stages, jobs and artifacts fit together by building a small pipeline step by step in the GitLab Web IDE (Use Case 1)
-2. Create a project on **GitLab.com** and install/register your own **GitLab Runner** inside this Codespace (Use Case 2)
+1. Learn how pipeline stages, jobs and artifacts fit together by building a small pipeline step by step in the GitLab Web IDE, running on a **GitLab Runner** you install in this Codespace (Use Case 1)
+2. Create a project on **GitLab.com**, connect the Codespace over SSH, and go deeper on runner registration and tags (Use Case 2)
 3. Push the `kkm-pulse-demo` Node.js app into that project and build a CI pipeline for it, adding SAST and SonarQube (Use Case 3)
 4. Extend the pipeline to build a Docker image and deploy it to the local k3d cluster (Use Case 4)
 5. Wire the pipeline into Dynatrace — deployment events, a load test, and Davis AI (Use Case 5)
 6. Split the pipeline into dev/prod stages with an automated gate (Use Case 6)
+7. Validate production with Dynatrace Site Reliability Guardian and roll back automatically via a Dynatrace Workflow (Use Case 7)
+8. Deploy blue-green with an SRG pre-merge gate so broken releases never reach `main` (Use Case 8)
 
 <div class="grid cards" markdown>
 - [Continue to Use Case 1 — Pipeline Stages, Jobs & Artifacts :octicons-arrow-right-24:](usecase1-pipelinestages.md)

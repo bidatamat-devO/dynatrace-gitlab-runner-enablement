@@ -56,8 +56,6 @@ deploy-job:
 !!! info "Nothing will run yet"
     Open ** → Pipelines** in GitLab and you'll see the pipeline stuck **pending** — there is no runner registered against this project yet. That's what the rest of this use case fixes.
 
-![Pipeline stuck in pending state — no runner registered](img/usecase1-pipeline-pending.png)
-
 ---
 
 ## 3. Install GitLab Runner inside the Codespace

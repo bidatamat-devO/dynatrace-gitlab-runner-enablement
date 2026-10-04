@@ -20,6 +20,7 @@ Everything runs inside a single **GitHub Codespace**: the Kubernetes cluster (k3
 
 By the end of this workshop you will be able to:
 
+- [x] Understand **pipeline stages, jobs and artifacts** by building a pipeline step by step in the GitLab Web IDE
 - [x] Create a **GitLab.com** project and connect it to your Codespace over SSH
 - [x] Install and register a **GitLab Runner** by hand, and reason about executor types and tags
 - [x] Build, test, and lint a **Node.js** application (`kkm-pulse-demo`) in a real pipeline
@@ -34,7 +35,7 @@ By the end of this workshop you will be able to:
 
 ## The Demo App — `kkm-pulse-demo`
 
-A small Express.js app simulating a hospital pulse-monitoring dashboard, used as the workshop's running example across all six use cases:
+A small Express.js app simulating a hospital pulse-monitoring dashboard, used as the workshop's running example across the use cases from Use Case 3 onward:
 
 | Endpoint | Purpose |
 |---|---|
@@ -58,6 +59,7 @@ Source lives at [.devcontainer/apps/kkm-pulse-demo](https://github.com/domuharah
 | [5 — Dynatrace Events & Load Testing](usecase5-dynatrace.md) | Deploy the OneAgent, send deployment events, run a load test, validate in Dynatrace |
 | [6 — Dev/Prod Gates](usecase6-devprodstages.md) | Separate dev/prod environments, manual approval, stop a bad build automatically |
 | [7 — Site Reliability Guardian & Automated Rollback](usecase7-srg-workflow.md) | SRG validates prod KPIs and security vulnerabilities; Dynatrace Workflow triggers automatic rollback |
+| [8 — Blue-Green Deployment with SRG Pre-Merge Gate](usecase8-blue-green-srg.md) | Deploy to a green namespace, let SRG gate the merge, and block broken releases before they reach `main` |
 | [Cleanup](cleanup.md) | Tear down everything created during the workshop |
 | [Resources](resources.md) | Reference links and further reading |
 

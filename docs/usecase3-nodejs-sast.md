@@ -2,7 +2,7 @@
 
 # Use Case 3 — Node.js CI, Test & SAST
 
-Now that a runner is alive, let's give it something real to build: **kkm-pulse-demo**, a small Express.js app already sitting in this Codespace at `.devcontainer/apps/kkm-pulse-demo`. You'll push it to its own GitLab project, then progressively build a pipeline: install → test → static analysis (SAST) → SonarQube quality gate.
+Now that a runner is alive, let's give it something real to build: **kkm-pulse-demo**, a small Express.js app already sitting in this Codespace at `.devcontainer/apps/kkm-pulse-demo`. You'll containerize it with Docker, connect to GitLab over SSH, push it to its own GitLab project, then progressively build a pipeline: install → test → static analysis (SAST) → SonarQube quality gate.
 
 ---
 
@@ -38,7 +38,64 @@ npm start
 ---
 
 
-## 2. Connect your Codespace to GitLab over SSH
+## 2. Containerize the app with Docker
+
+Before pipelines, learn how the app gets packaged. The app ships with a `Dockerfile` — read it first:
+
+```bash
+cat Dockerfile
+```
+
+```dockerfile
+FROM node:18-alpine          # base image: Node.js on a tiny Alpine Linux
+WORKDIR /app                 # all following commands run in /app
+COPY package*.json ./        # copy dependency manifests first (layer caching)
+RUN npm install              # install dependencies; cached until package*.json changes
+COPY . .                     # copy the application source
+EXPOSE 3000                  # document the port the app listens on
+CMD ["npm", "start"]         # command run when the container starts
+```
+
+!!! info "Why copy `package*.json` before the rest?"
+    Docker caches each instruction as a layer. Source code changes often, dependencies rarely. Copying the manifests first means `npm install` is only re-run when dependencies change, which makes rebuilds much faster.
+
+Add a `.dockerignore` so your local `node_modules` and git history don't get copied into the image:
+
+```bash
+printf "node_modules\n.git\nnpm-debug.log\n" > .dockerignore
+```
+
+Build the image, run it, and test it (the Codespace has Docker available):
+
+```bash
+docker build -t kkm-pulse-demo:local .
+docker run -d --name kkm-pulse -p 3000:3000 kkm-pulse-demo:local
+curl http://localhost:3000/api/status
+```
+
+Useful commands to explore what you built:
+
+```bash
+docker images kkm-pulse-demo      # the image and its size
+docker ps                         # the running container
+docker logs kkm-pulse             # app output (KKM Pulse App running hot on port 3000)
+docker exec -it kkm-pulse sh      # open a shell inside the container
+```
+
+Clean up when you're done:
+
+```bash
+docker rm -f kkm-pulse
+```
+
+!!! tip "Used later"
+    Use Case 4 builds this same image inside a pipeline and deploys it to Kubernetes.
+
+---
+
+## 3. Connect your Codespace to GitLab over SSH
+
+The key is only used to push and pull code over SSH; the runner registers over HTTPS with its own token.
 
 ### Generate an SSH key in the Codespace
 
@@ -61,7 +118,7 @@ cat ~/.ssh/id_ed25519.pub
 
 ---
 
-## 2. Create the project in GitLab and push
+## 4. Create the project in GitLab and push
 
 !!! example "Step-by-step"
     1. On [gitlab.com](https://gitlab.com), click **Create new... → New project/repository → Create blank project**
@@ -83,7 +140,7 @@ git push --set-upstream origin main
 
 ---
 
-## 3. Register a runner for this project
+## 5. Register a runner for this project
 
 Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its own registration (the same `gitlab-runner` service from Use Case 2 can hold multiple registrations at once).
 
@@ -124,7 +181,7 @@ Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its 
     --description "codespace-shell-runner-kkm"
   ```
 
-5. Copy paste and Run step 3 to run the gitlab-runer
+5. Copy paste and run the command below to start the gitlab-runer
 
 ```
 gitlab-runner run
@@ -135,7 +192,7 @@ You will see the gitlab runner waiting for job to run on the terminal, you can v
 ![Runner showing online status in GitLab Settings → CI/CD → Runners](img/usecase2-runner-online.png)
 
 
-## 4. Build and test stages
+## 6. Build and test stages
 
 The repo already ships a `.gitlab-ci.yaml`. Replace it with this working version (fixes the placeholder stages and removes the `image:` keys, which the **shell** executor ignores anyway — jobs run directly on the Codespace host where Node.js is already installed):
 
@@ -175,7 +232,7 @@ Watch it go green under **CI/CD → Pipelines**.
 
 ---
 
-## 5. Add SAST
+## 7. Add SAST
 
 GitLab ships a ready-made SAST template that auto-selects analyzers based on your project's languages.
 
@@ -199,7 +256,7 @@ Push it and look at the **Test** stage in the pipeline graph — you'll see the 
 
 ---
 
-## 6. Install SonarQube (Code Quality Gate)
+## 8. Install SonarQube (Code Quality Gate)
 
 SonarQube Community Edition installs into the Kubernetes cluster with a single command using a helper already loaded in your shell.
 

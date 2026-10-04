@@ -189,6 +189,94 @@ Commit (`fix: pass build output as artifact`). This time both jobs turn **green*
 
 ---
 
+## Knowledge Check
+
+### 1. Why does `test_car` still fail after declaring `stages:`?
+
+In Step 3 you declared `stages: [build, test]`, and the pipeline showed **build → test** — yet `test_car` still failed on `test -f build/car.txt`.
+
+??? question "Show Answer"
+
+    **Why:** `stages:` only controls the **order** in which jobs run. It does not share files between jobs. Each job still starts in a fresh, clean workspace, so `build/car.txt` created by `build_car` is gone when `test_car` starts.
+
+    **The fix:** have `build_car` publish the folder as an artifact. GitLab uploads it when the job finishes and downloads it into every job in later stages:
+
+    ```yaml
+    build_car:
+        stage: build
+        script:
+            - mkdir build
+            - echo "chassis" > build/car.txt
+        artifacts:
+            paths:
+                - build/
+    ```
+
+    **Bonus:** add `expire_in: 1 hour` under `artifacts:` so old build output is cleaned up automatically instead of piling up in storage.
+
+    **Key takeaway:** *stages* decide **when** a job runs, *artifacts* decide **what files** it receives.
+
+---
+
+### 2. Hands-on: Add a `deploy` stage and a parallel test
+
+Extend the green pipeline from Step 4:
+
+1. Add a new stage `deploy` after `test`
+2. Add a second test job `test_wheels` in the `test` stage that creates nothing itself but checks that `build/car.txt` exists
+3. Add a `deploy_car` job in the `deploy` stage that prints `car deployed!` and shows the contents of `build/car.txt`
+
+Commit and open the pipeline. How many columns do you see, and which jobs run in parallel? Then change `test_wheels` to `- test -f build/wheels.txt` — what happens to `deploy_car`, and why?
+
+??? question "Show Answer: Pipeline and expected behaviour"
+
+    **Solution:**
+
+    ```yaml
+    stages:
+        - build
+        - test
+        - deploy
+
+    build_car:
+        image: alpine
+        stage: build
+        script:
+            - mkdir build
+            - echo "chassis" > build/car.txt
+        artifacts:
+            paths:
+                - build/
+
+    test_car:
+        image: alpine
+        stage: test
+        script:
+            - test -f build/car.txt
+            - grep "chassis" build/car.txt
+
+    test_wheels:
+        image: alpine
+        stage: test
+        script:
+            - test -f build/car.txt
+
+    deploy_car:
+        image: alpine
+        stage: deploy
+        script:
+            - echo "car deployed!"
+            - cat build/car.txt
+    ```
+
+    **What you'll see:** three columns — **build → test → deploy**. `test_car` and `test_wheels` sit in the same stage, so they run **in parallel**. `deploy_car` receives `build/` too, because artifacts from earlier stages are downloaded into all later jobs.
+
+    **When `test_wheels` checks `build/wheels.txt`:** that file was never created, so `test_wheels` fails. A failed job fails its stage, and the pipeline stops before the next stage — `deploy_car` is marked **skipped** and never runs.
+
+    **Key takeaway:** this is why stages act as quality gates — nothing gets deployed unless every job in the earlier stages passed.
+
+---
+
 <div class="grid cards" markdown>
 - [Continue to Use Case 2 — First GitLab Project & Runner :octicons-arrow-right-24:](usecase2-gitlabrunner.md)
 </div>
