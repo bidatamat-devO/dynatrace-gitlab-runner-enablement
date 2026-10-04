@@ -1,6 +1,6 @@
 # Dev ingress — includes a catch-all (no host) rule so the Codespaces
 # forwarded port 80 (https://$CODESPACE_NAME-80.app.github.dev) reaches this
-# app directly in a browser. See usecase3-deployk8s.md.
+# app directly in a browser. See usecase4-deployk8s.md.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

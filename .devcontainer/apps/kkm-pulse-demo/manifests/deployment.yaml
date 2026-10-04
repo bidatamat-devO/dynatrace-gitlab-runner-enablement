@@ -1,5 +1,5 @@
 # Deployed by GitLab CI — __NAMESPACE__ and __IMAGE__ are substituted at deploy time.
-# See usecase3-deployk8s.md and usecase5-devprodstages.md.
+# See usecase4-deployk8s.md and usecase6-devprodstages.md.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

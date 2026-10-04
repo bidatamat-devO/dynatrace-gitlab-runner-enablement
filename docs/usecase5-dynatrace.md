@@ -1,6 +1,6 @@
 --8<-- "snippets/dt-enablement.md"
 
-# Use Case 4 — Dynatrace Events & Load Testing
+# Use Case 5 — Dynatrace Events & Load Testing
 
 `kkm-pulse-demo` now deploys itself to Kubernetes on every pipeline run. Let's make Dynatrace aware of it: install the OneAgent, mark every deployment with a **Dynatrace event**, run a small **load test** from the pipeline, and push the test result back into Dynatrace as another event.
 
@@ -218,7 +218,7 @@ Open **Problems** in Dynatrace — Davis AI should surface a CPU saturation prob
 
 ## What "stop a bad build" means here
 
-`notify-dynatrace-test-result` exits non-zero when the error budget is blown. Since it's a downstream `needs` dependency, any stage you add **after** `load_test` (like a production deploy) simply won't start if this job fails — the bad build never leaves dev. Use Case 5 builds exactly that gate.
+`notify-dynatrace-test-result` exits non-zero when the error budget is blown. Since it's a downstream `needs` dependency, any stage you add **after** `load_test` (like a production deploy) simply won't start if this job fails — the bad build never leaves dev. Use Case 6 builds exactly that gate.
 
 ---
 
@@ -299,5 +299,5 @@ Modify the gate section of `notify-dynatrace-test-result` so that the job fails 
     This keeps the pipeline gate and the Dynatrace record in sync.
 
 <div class="grid cards" markdown>
-- [Continue to Use Case 5 — Dev/Prod Gates :octicons-arrow-right-24:](usecase5-devprodstages.md)
+- [Continue to Use Case 6 — Dev/Prod Gates :octicons-arrow-right-24:](usecase6-devprodstages.md)
 </div>

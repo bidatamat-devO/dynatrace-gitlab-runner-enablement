@@ -2,7 +2,7 @@
 # competes with the dev ingress for the Codespaces port-80 forward. Reach it
 # from the terminal with a Host-header curl, e.g.:
 #   curl -H "Host: kkm-pulse-prod.127.0.0.1.sslip.io" http://localhost/api/status
-# See usecase5-devprodstages.md.
+# See usecase6-devprodstages.md.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

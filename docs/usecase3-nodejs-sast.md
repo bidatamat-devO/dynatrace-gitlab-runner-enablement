@@ -1,6 +1,6 @@
 --8<-- "snippets/dt-enablement.md"
 
-# Use Case 2 — Node.js CI, Test & SAST
+# Use Case 3 — Node.js CI, Test & SAST
 
 Now that a runner is alive, let's give it something real to build: **kkm-pulse-demo**, a small Express.js app already sitting in this Codespace at `.devcontainer/apps/kkm-pulse-demo`. You'll push it to its own GitLab project, then progressively build a pipeline: install → test → static analysis (SAST) → SonarQube quality gate.
 
@@ -85,7 +85,7 @@ git push --set-upstream origin main
 
 ## 3. Register a runner for this project
 
-Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its own registration (the same `gitlab-runner` service from Use Case 1 can hold multiple registrations at once).
+Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its own registration (the same `gitlab-runner` service from Use Case 2 can hold multiple registrations at once).
 
 1. In the `kkm-pulse-demo` project: **Settings → CI/CD → Runners → New project runner**
 2. Tags: `shell`, and Create the Runner
@@ -134,32 +134,6 @@ You will see the gitlab runner waiting for job to run on the terminal, you can v
 
 ![Runner showing online status in GitLab Settings → CI/CD → Runners](img/usecase2-runner-online.png)
 
-//TODO to validate and clean
-### Give the runner access to Docker and the cluster
-
-Pipeline jobs will run `docker build` and `kubectl apply` as the `gitlab-runner` Linux user — it needs the same Docker group membership and kubeconfig your own `vscode` user already has.
-
-```bash
-# Let gitlab-runner talk to the Docker socket
-sudo usermod -aG docker gitlab-runner
-
-# Share the kubeconfig so gitlab-runner can reach the k3d-enablement cluster
-sudo mkdir -p /home/gitlab-runner/.kube
-sudo cp ~/.kube/config /home/gitlab-runner/.kube/config
-sudo chown -R gitlab-runner:gitlab-runner /home/gitlab-runner/.kube
-```
-
-### Install and start the runner service
-
-```bash
-sudo gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
-sudo gitlab-runner start
-```
-
-!!! tip "Group membership needs a restart"
-    `usermod -aG docker` only takes effect for **new** processes. Since you ran it before `gitlab-runner start`, the service picks it up immediately. If you ever add the group *after* the service is already running, restart it with `sudo gitlab-runner restart`.
-
----
 
 ## 4. Build and test stages
 
@@ -256,8 +230,6 @@ Port `9000` is already pre-declared in this Codespace (see `devcontainer.json`):
 ![Making port 9000 public in VS Code Ports panel](img/usecase2-sonar-port-public.png)
 
 Log in with **admin / admin** and set a new password when prompted.
-
-![SonarQube login page — first login with admin/admin](img/usecase2-sonar-login.png)
 
 
 ### Configure GitLab and Sonar Token
@@ -417,5 +389,5 @@ Push the change, let the pipeline run, then check the SonarQube UI.
 ---
 
 <div class="grid cards" markdown>
-- [Continue to Use Case 3 — Docker Build & Deploy to K8s :octicons-arrow-right-24:](usecase3-deployk8s.md)
+- [Continue to Use Case 4 — Docker Build & Deploy to K8s :octicons-arrow-right-24:](usecase4-deployk8s.md)
 </div>

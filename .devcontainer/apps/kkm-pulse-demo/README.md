@@ -36,4 +36,4 @@ npm start
 
 ## Workshop
 
-Follow the full walkthrough starting at `docs/usecase2-nodejs-sast.md` in the [dynatrace-gitlab-runner-enablement](https://github.com/domuharahap/dynatrace-gitlab-runner-enablement) repository (or the published MkDocs site, if you have one set up).
+Follow the full walkthrough starting at `docs/usecase3-nodejs-sast.md` in the [dynatrace-gitlab-runner-enablement](https://github.com/domuharahap/dynatrace-gitlab-runner-enablement) repository (or the published MkDocs site, if you have one set up).

@@ -42,7 +42,7 @@ A small Express.js app simulating a hospital pulse-monitoring dashboard, used as
 | `GET /api/status` | Returns simulated clinic status JSON |
 | `GET /api/trigger-anomaly` | Spikes CPU for 3s — great for showing Davis AI anomaly detection |
 
-Source lives at [.devcontainer/apps/kkm-pulse-demo](https://github.com/domuharahap/dynatrace-gitlab-runner-enablement/tree/main/.devcontainer/apps/kkm-pulse-demo) inside this repository — you'll push a copy of it to your own GitLab project in Use Case 2.
+Source lives at [.devcontainer/apps/kkm-pulse-demo](https://github.com/domuharahap/dynatrace-gitlab-runner-enablement/tree/main/.devcontainer/apps/kkm-pulse-demo) inside this repository — you'll push a copy of it to your own GitLab project in Use Case 3.
 
 ---
 
@@ -51,12 +51,13 @@ Source lives at [.devcontainer/apps/kkm-pulse-demo](https://github.com/domuharah
 | Use Case | Content |
 |---|---|
 | [Getting Started](getting-started.md) | Prerequisites, Codespace launch, Dynatrace secrets |
-| [1 — First GitLab Project & Runner](usecase1-gitlabrunner.md) | Create a GitLab.com project, SSH keys, install & register a GitLab Runner |
-| [2 — Node.js CI, Test & SAST](usecase2-nodejs-sast.md) | Push `kkm-pulse-demo`, build/test stages, GitLab SAST, SonarQube quality gate |
-| [3 — Docker Build & Deploy to K8s](usecase3-deployk8s.md) | Build a Docker image in CI, load it into k3d, deploy & expose it |
-| [4 — Dynatrace Events & Load Testing](usecase4-dynatrace.md) | Deploy the OneAgent, send deployment events, run a load test, validate in Dynatrace |
-| [5 — Dev/Prod Gates](usecase5-devprodstages.md) | Separate dev/prod environments, manual approval, stop a bad build automatically |
-| [6 — Site Reliability Guardian & Automated Rollback](usecase6-srg-workflow.md) | SRG validates prod KPIs and security vulnerabilities; Dynatrace Workflow triggers automatic rollback |
+| [1 — Pipeline Stages, Jobs & Artifacts](usecase1-pipelinestages.md) | Build a pipeline step by step in the GitLab Web IDE: a job, a failing test, stages, artifacts |
+| [2 — First GitLab Project & Runner](usecase2-gitlabrunner.md) | Create a GitLab.com project, SSH keys, install & register a GitLab Runner |
+| [3 — Node.js CI, Test & SAST](usecase3-nodejs-sast.md) | Push `kkm-pulse-demo`, build/test stages, GitLab SAST, SonarQube quality gate |
+| [4 — Docker Build & Deploy to K8s](usecase4-deployk8s.md) | Build a Docker image in CI, load it into k3d, deploy & expose it |
+| [5 — Dynatrace Events & Load Testing](usecase5-dynatrace.md) | Deploy the OneAgent, send deployment events, run a load test, validate in Dynatrace |
+| [6 — Dev/Prod Gates](usecase6-devprodstages.md) | Separate dev/prod environments, manual approval, stop a bad build automatically |
+| [7 — Site Reliability Guardian & Automated Rollback](usecase7-srg-workflow.md) | SRG validates prod KPIs and security vulnerabilities; Dynatrace Workflow triggers automatic rollback |
 | [Cleanup](cleanup.md) | Tear down everything created during the workshop |
 | [Resources](resources.md) | Reference links and further reading |
 

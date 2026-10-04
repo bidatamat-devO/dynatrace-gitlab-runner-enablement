@@ -1,6 +1,6 @@
 --8<-- "snippets/dt-enablement.md"
 
-# Use Case 7 — Blue-Green Deployment with SRG Pre-Merge Gate
+# Use Case 8 — Blue-Green Deployment with SRG Pre-Merge Gate
 
 Use Cases 5 and 6 introduced two quality gates: a manual human approval before production, and an automated SRG rollback *after* deployment. Both patterns react to a deployment that has already reached production. This use case moves the validation **earlier** — before the merge to `main` even happens.
 
@@ -38,7 +38,7 @@ At any point in time, one namespace (`kkm-pulse-blue` or `kkm-pulse-green`) is t
 
 ## 2. Bootstrap the blue environment
 
-The blue namespace represents the current production version. If you completed Use Case 5, `kkm-pulse-prod` is already running — promote it to blue by creating the namespace and copying the deployment.
+The blue namespace represents the current production version. If you completed Use Case 6, `kkm-pulse-prod` is already running — promote it to blue by creating the namespace and copying the deployment.
 
 ```bash
 # Create the blue namespace and deploy the current image
@@ -362,13 +362,13 @@ Edit `server.js` to inject failures on every request:
 
 ```js title="server.js (edit — temporary)" linenums="1"
 app.get('/api/status', (req, res) => {
-  res.status(500).json({ error: "simulated regression — use case 7" });
+  res.status(500).json({ error: "simulated regression — use case 8" });
 });
 ```
 
 ```bash
 git add server.js
-git commit -m "feat: broken release (use case 7 test)"
+git commit -m "feat: broken release (use case 8 test)"
 git push -u origin feature/broken-release
 ```
 
@@ -412,7 +412,7 @@ git push origin --delete feature/broken-release
 
 ## 8. Manual rollback using the blue slot
 
-If a problem surfaces after promotion (before Use Case 6's automated rollback fires), you can switch back to blue in seconds:
+If a problem surfaces after promotion (before Use Case 7's automated rollback fires), you can switch back to blue in seconds:
 
 ```bash
 # Switch ingress back to blue
@@ -426,8 +426,8 @@ echo "Rolled back to blue slot"
 curl -H "Host: kkm-pulse.127.0.0.1.sslip.io" http://localhost/api/status
 ```
 
-!!! tip "Blue-green + Use Case 6 automated rollback"
-    The automated Dynatrace Workflow rollback from Use Case 6 remains active. When it fires, update the `rollback-prod` job to use the same `kubectl patch` command above instead of `kubectl rollout undo` — that way, both manual and automated rollbacks use the same mechanism and you always know which slot is live by reading the ConfigMap.
+!!! tip "Blue-green + Use Case 7 automated rollback"
+    The automated Dynatrace Workflow rollback from Use Case 7 remains active. When it fires, update the `rollback-prod` job to use the same `kubectl patch` command above instead of `kubectl rollout undo` — that way, both manual and automated rollbacks use the same mechanism and you always know which slot is live by reading the ConfigMap.
 
 ---
 
@@ -463,7 +463,7 @@ The `srg-gate` job waits for metrics from `kkm-pulse-green`, even though blue is
     **How production teams address this:**
 
     - Send a **canary percentage** (e.g. 5–10%) of real traffic to green via weighted ingress rules while keeping the bulk on blue. SRG then evaluates green under real user load before the full switch.
-    - Run a dedicated **smoke test** or **synthetic load** against green during the evaluation window — similar to the load test in Use Case 4, but targeted at the green endpoint.
+    - Run a dedicated **smoke test** or **synthetic load** against green during the evaluation window — similar to the load test in Use Case 5, but targeted at the green endpoint.
     - In this workshop, the pipeline health-check and Traffic objective floor provide a minimal but meaningful gate.
 
 ---
@@ -549,13 +549,14 @@ Show the pipeline job and the check you would use.
 
 Across seven use cases you took `kkm-pulse-demo` from zero to a fully observable, self-healing pipeline with a pre-merge quality gate:
 
-1. **Use Case 1** — GitLab project and a self-hosted runner registered over SSH
-2. **Use Case 2** — Build, test, SAST, and SonarQube quality gate on every push
-3. **Use Case 3** — Docker image built in CI, loaded into k3d, deployed and exposed on Kubernetes
-4. **Use Case 4** — Dynatrace OneAgent, deployment events, load test graded against an error budget
-5. **Use Case 5** — Separate dev/prod environments with a structural gate: a bad build can never reach the ▶️ button
-6. **Use Case 6** — Dynatrace Workflow evaluates SRG on every deployment; triggers GitLab rollback automatically when production degrades
-7. **Use Case 7** — Blue-green deployment with SRG pre-merge gate: broken releases are blocked before they ever touch `main`
+1. **Use Case 1** — Pipeline stages, jobs and artifacts built step by step in the GitLab Web IDE
+2. **Use Case 2** — GitLab project and a self-hosted runner registered over SSH
+3. **Use Case 3** — Build, test, SAST, and SonarQube quality gate on every push
+4. **Use Case 4** — Docker image built in CI, loaded into k3d, deployed and exposed on Kubernetes
+5. **Use Case 5** — Dynatrace OneAgent, deployment events, load test graded against an error budget
+6. **Use Case 6** — Separate dev/prod environments with a structural gate: a bad build can never reach the ▶️ button
+7. **Use Case 7** — Dynatrace Workflow evaluates SRG on every deployment; triggers GitLab rollback automatically when production degrades
+8. **Use Case 8** — Blue-green deployment with SRG pre-merge gate: broken releases are blocked before they ever touch `main`
 
 <div class="grid cards" markdown>
 - [Continue to Cleanup :octicons-arrow-right-24:](cleanup.md)

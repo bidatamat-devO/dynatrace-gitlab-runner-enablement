@@ -1,6 +1,6 @@
 --8<-- "snippets/dt-enablement.md"
 
-# Use Case 3 — Docker Build & Deploy to K8s
+# Use Case 4 — Docker Build & Deploy to K8s
 
 Your pipeline can build, test, and quality-check `kkm-pulse-demo`. Now let's actually ship it: build a Docker image in CI and run it as a real Deployment on the k3d cluster already running inside this Codespace — **no external registry required**.
 
@@ -246,5 +246,5 @@ List the two `kubectl` commands you would run first to find the root cause, and 
     | Readiness probe failure | App starts but `/api/status` returns non-2xx — check application logic |
 
 <div class="grid cards" markdown>
-- [Continue to Use Case 4 — Dynatrace Events & Load Testing :octicons-arrow-right-24:](usecase4-dynatrace.md)
+- [Continue to Use Case 5 — Dynatrace Events & Load Testing :octicons-arrow-right-24:](usecase5-dynatrace.md)
 </div>

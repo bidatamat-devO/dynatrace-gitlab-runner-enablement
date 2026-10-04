@@ -1,6 +1,6 @@
 --8<-- "snippets/dt-enablement.md"
 
-# Use Case 1 — First GitLab Project & Runner
+# Use Case 2 — First GitLab Project & Runner
 
 In this use case you will create your first project on **GitLab.com**, connect your Codespace to it over SSH, and install your own **GitLab Runner** directly inside the Codespace so it can execute pipelines against the Kubernetes cluster and Docker daemon already running there.
 
@@ -63,6 +63,9 @@ deploy-job:
 ## 3. Install GitLab Runner inside the Codespace
 
 The Codespace already has Docker, `kubectl`, `k3d`, and Node.js installed and a k3d cluster running — installing the runner as a **shell executor** lets every pipeline job use those tools directly, with no extra Docker-in-Docker setup.
+
+!!! note "Already installed in Use Case 1?"
+    Use Case 1 installs the runner binary for you. If `gitlab-runner --version` already works in your terminal, skip the commands below and continue at section 4 to register a runner for this new project.
 
 ```bash
 # Download the binary for the codespace's architecture (amd64 shown; use arm64 on Apple Silicon)
@@ -276,5 +279,5 @@ deploy-job:
 ---
 
 <div class="grid cards" markdown>
-- [Continue to Use Case 2 — Node.js CI, Test & SAST :octicons-arrow-right-24:](usecase2-nodejs-sast.md)
+- [Continue to Use Case 3 — Node.js CI, Test & SAST :octicons-arrow-right-24:](usecase3-nodejs-sast.md)
 </div>

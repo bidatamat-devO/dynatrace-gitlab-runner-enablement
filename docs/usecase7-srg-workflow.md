@@ -1,6 +1,6 @@
 --8<-- "snippets/dt-enablement.md"
 
-# Use Case 6 — Site Reliability Guardian & Automated Rollback
+# Use Case 7 — Site Reliability Guardian & Automated Rollback
 
 The pipeline now deploys to production with a human approval gate and a load-test quality check. But what happens *after* the deployment completes? Even when pre-deployment gates pass, real production traffic can reveal issues — elevated latency, higher error rates, or newly-detected security vulnerabilities — that only emerge under genuine load.
 
@@ -215,7 +215,7 @@ Save and **activate** the Workflow.
 
 ### Test the first step
 
-Push a trivial commit to trigger the pipeline through to production, approve the Use Case 5 manual gate, and let `notify-dynatrace-prod-deploy` run.
+Push a trivial commit to trigger the pipeline through to production, approve the Use Case 6 manual gate, and let `notify-dynatrace-prod-deploy` run.
 
 In Dynatrace: **Apps → Workflows → kkm-pulse-demo SRG → Executions** — a new execution should appear within seconds. After ~2 minutes wait plus evaluation time, the execution completes. Open it and check:
 
@@ -240,7 +240,7 @@ wait
 Trigger another pipeline run (or re-run the Workflow manually). The latency objective will breach its threshold; the SRG returns `FAIL`; Action 2 output shows `executionStatus: FAIL`.
 
 !!! tip "SRG vs. the load test"
-    The load test in Use Case 4 measures what *your curl loop* observed — a synthetic sample under controlled conditions. SRG evaluates metrics Dynatrace collected from *real application traffic* during the evaluation window. These are complementary gates: the load test catches obvious breakage early; SRG catches subtle regressions that only appear under concurrent production load.
+    The load test in Use Case 5 measures what *your curl loop* observed — a synthetic sample under controlled conditions. SRG evaluates metrics Dynatrace collected from *real application traffic* during the evaluation window. These are complementary gates: the load test catches obvious breakage early; SRG catches subtle regressions that only appear under concurrent production load.
 
 ---
 
@@ -474,15 +474,16 @@ Show the Workflow action configuration and the message template you would use.
 
 Across six use cases you took `kkm-pulse-demo` from zero to a fully observable, self-healing pipeline:
 
-1. **Use Case 1** — GitLab project and a self-hosted runner registered over SSH
-2. **Use Case 2** — Build, test, SAST, and SonarQube quality gate on every push
-3. **Use Case 3** — Docker image built in CI, loaded into k3d, deployed and exposed on Kubernetes
-4. **Use Case 4** — Dynatrace OneAgent, deployment events, load test graded against an error budget
-5. **Use Case 5** — Separate dev/prod environments with a structural gate: a bad build can never reach the ▶️ button
-6. **Use Case 6** — Dynatrace Workflow evaluates SRG on every deployment; triggers GitLab rollback automatically when production degrades
+1. **Use Case 1** — Pipeline stages, jobs and artifacts built step by step in the GitLab Web IDE
+2. **Use Case 2** — GitLab project and a self-hosted runner registered over SSH
+3. **Use Case 3** — Build, test, SAST, and SonarQube quality gate on every push
+4. **Use Case 4** — Docker image built in CI, loaded into k3d, deployed and exposed on Kubernetes
+5. **Use Case 5** — Dynatrace OneAgent, deployment events, load test graded against an error budget
+6. **Use Case 6** — Separate dev/prod environments with a structural gate: a bad build can never reach the ▶️ button
+7. **Use Case 7** — Dynatrace Workflow evaluates SRG on every deployment; triggers GitLab rollback automatically when production degrades
 
-Use Case 7 goes further: SRG moves upstream and blocks the merge itself — broken releases never reach `main`.
+Use Case 8 goes further: SRG moves upstream and blocks the merge itself — broken releases never reach `main`.
 
 <div class="grid cards" markdown>
-- [Continue to Use Case 7 — Blue-Green Deployment with SRG Pre-Merge Gate :octicons-arrow-right-24:](usecase7-blue-green-srg.md)
+- [Continue to Use Case 8 — Blue-Green Deployment with SRG Pre-Merge Gate :octicons-arrow-right-24:](usecase8-blue-green-srg.md)
 </div>

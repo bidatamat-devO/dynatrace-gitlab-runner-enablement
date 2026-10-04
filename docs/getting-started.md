@@ -60,9 +60,9 @@ The Codespace pre-declares three forwarded ports:
 
 | Port | Label | Used for |
 |---|---|---|
-| `80` | Ingress (Applications) | Any app exposed via the in-cluster nginx ingress — this is how you'll reach `kkm-pulse-demo` from your browser starting in Use Case 3 |
+| `80` | Ingress (Applications) | Any app exposed via the in-cluster nginx ingress — this is how you'll reach `kkm-pulse-demo` from your browser starting in Use Case 4 |
 | `8929` | GitLab | Reserved by the framework image; not used in this workshop since we use GitLab.com |
-| `9000` | SonarQube | Reachable once you run `installSonarqube` in Use Case 2 |
+| `9000` | SonarQube | Reachable once you run `installSonarqube` in Use Case 3 |
 
 !!! example "Making a port public"
     1. Open the **Ports** panel in VS Code (`View → Open View → Ports`)
@@ -76,14 +76,15 @@ The Codespace pre-declares three forwarded ports:
 
 ## Part 3 — What You'll Build
 
-Across the five use cases you will:
+Across the six use cases you will:
 
-1. Create a project on **GitLab.com** and install/register your own **GitLab Runner** inside this Codespace (Use Case 1)
-2. Push the `kkm-pulse-demo` Node.js app into that project and build a CI pipeline for it, adding SAST and SonarQube (Use Case 2)
-3. Extend the pipeline to build a Docker image and deploy it to the local k3d cluster (Use Case 3)
-4. Wire the pipeline into Dynatrace — deployment events, a load test, and Davis AI (Use Case 4)
-5. Split the pipeline into dev/prod stages with an automated gate (Use Case 5)
+1. Learn how pipeline stages, jobs and artifacts fit together by building a small pipeline step by step in the GitLab Web IDE (Use Case 1)
+2. Create a project on **GitLab.com** and install/register your own **GitLab Runner** inside this Codespace (Use Case 2)
+3. Push the `kkm-pulse-demo` Node.js app into that project and build a CI pipeline for it, adding SAST and SonarQube (Use Case 3)
+4. Extend the pipeline to build a Docker image and deploy it to the local k3d cluster (Use Case 4)
+5. Wire the pipeline into Dynatrace — deployment events, a load test, and Davis AI (Use Case 5)
+6. Split the pipeline into dev/prod stages with an automated gate (Use Case 6)
 
 <div class="grid cards" markdown>
-- [Continue to Use Case 1 — First GitLab Project & Runner :octicons-arrow-right-24:](usecase1-gitlabrunner.md)
+- [Continue to Use Case 1 — Pipeline Stages, Jobs & Artifacts :octicons-arrow-right-24:](usecase1-pipelinestages.md)
 </div>

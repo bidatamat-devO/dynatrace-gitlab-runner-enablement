@@ -5,13 +5,14 @@ repo_url: "https://github.com/domuharahap/dynatrace-gitlab-runner-enablement"
 nav:
   - 'About': index.md
   - 'Getting Started': getting-started.md
-  - 'Use Case 1 — First GitLab Project & Runner': usecase1-gitlabrunner.md
-  - 'Use Case 2 — Node.js CI, Test & SAST': usecase2-nodejs-sast.md
-  - 'Use Case 3 — Docker Build & Deploy to K8s': usecase3-deployk8s.md
-  - 'Use Case 4 — Dynatrace Events & Load Testing': usecase4-dynatrace.md
-  - 'Use Case 5 — Dev/Prod Gates': usecase5-devprodstages.md
-  - 'Use Case 6 — Site Reliability Guardian & Automated Rollback': usecase6-srg-workflow.md
-  - 'Use Case 7 — Blue-Green Deployment with SRG Pre-Merge Gate': usecase7-blue-green-srg.md
+  - 'Use Case 1 — Pipeline Stages, Jobs & Artifacts': usecase1-pipelinestages.md
+  - 'Use Case 2 — First GitLab Project & Runner': usecase2-gitlabrunner.md
+  - 'Use Case 3 — Node.js CI, Test & SAST': usecase3-nodejs-sast.md
+  - 'Use Case 4 — Docker Build & Deploy to K8s': usecase4-deployk8s.md
+  - 'Use Case 5 — Dynatrace Events & Load Testing': usecase5-dynatrace.md
+  - 'Use Case 6 — Dev/Prod Gates': usecase6-devprodstages.md
+  - 'Use Case 7 — Site Reliability Guardian & Automated Rollback': usecase7-srg-workflow.md
+  - 'Use Case 8 — Blue-Green Deployment with SRG Pre-Merge Gate': usecase8-blue-green-srg.md
   - 'Cleanup': cleanup.md
   - 'Resources': resources.md
   - "What's Next": whats-next.md

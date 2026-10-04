@@ -1,6 +1,6 @@
 --8<-- "snippets/dt-enablement.md"
 
-# Use Case 5 — Dev/Prod Gates
+# Use Case 6 — Dev/Prod Gates
 
 The pipeline builds, tests, scans, containerizes, deploys to dev, and load-tests itself. The last piece: a **separate production environment** that only ever receives a build that already passed the load test — and a manual approval step, since promoting to prod should be a deliberate human decision, not an automatic one.
 
@@ -92,7 +92,7 @@ git push
 
 ### Why this is a real gate, not decoration
 
-- `deploy-prod` declares `needs: [notify-dynatrace-test-result]`. In GitLab CI, a `needs` dependency must **succeed** before the dependent job is even offered — `notify-dynatrace-test-result` is the job from Use Case 4 that `exit 1`s when the load test's error rate exceeds 10%.
+- `deploy-prod` declares `needs: [notify-dynatrace-test-result]`. In GitLab CI, a `needs` dependency must **succeed** before the dependent job is even offered — `notify-dynatrace-test-result` is the job from Use Case 5 that `exit 1`s when the load test's error rate exceeds 10%.
 - `when: manual` means even a passing pipeline **pauses** at `deploy_prod` — someone has to click ▶️ in the GitLab UI. This models a real approval gate (release manager, change board, whoever you'd want signing off in your org).
 - Put both together: a bad build can never reach the manual button, and a good build never ships to prod by accident.
 
@@ -288,16 +288,16 @@ Sketch the job definition and explain where it fits in the `stages:` list.
 
 ## Recap
 
-Across five use cases you took `kkm-pulse-demo` from zero to a pipeline that:
+Across the use cases you took `kkm-pulse-demo` from zero to a pipeline that:
 
-1. Builds and tests on every push (Use Case 2)
-2. Statically scans the code and enforces a SonarQube quality gate (Use Case 2)
-3. Packages a Docker image and deploys it to Kubernetes with no external registry (Use Case 3)
-4. Reports every deployment and load-test result to Dynatrace as an event, and gets validated against Davis AI anomaly detection (Use Case 4)
-5. Separates dev and prod, and structurally cannot promote a build that failed its load test (Use Case 5)
+1. Builds and tests on every push (Use Cases 1 and 3)
+2. Statically scans the code and enforces a SonarQube quality gate (Use Case 3)
+3. Packages a Docker image and deploys it to Kubernetes with no external registry (Use Case 4)
+4. Reports every deployment and load-test result to Dynatrace as an event, and gets validated against Davis AI anomaly detection (Use Case 5)
+5. Separates dev and prod, and structurally cannot promote a build that failed its load test (Use Case 6)
 
-Use Case 6 goes further: Dynatrace's Site Reliability Guardian validates production against KPI and security objectives *after* deployment, and a Dynatrace Workflow automatically calls back the pipeline to trigger a rollback when production degrades.
+Use Case 7 goes further: Dynatrace's Site Reliability Guardian validates production against KPI and security objectives *after* deployment, and a Dynatrace Workflow automatically calls back the pipeline to trigger a rollback when production degrades.
 
 <div class="grid cards" markdown>
-- [Continue to Use Case 6 — SRG & Automated Rollback :octicons-arrow-right-24:](usecase6-srg-workflow.md)
+- [Continue to Use Case 7 — SRG & Automated Rollback :octicons-arrow-right-24:](usecase7-srg-workflow.md)
 </div>
