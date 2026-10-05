@@ -92,7 +92,7 @@ Click **Add More objective** for each of the two below.
 !!! info "Application Security required"
     The security objective requires **Dynatrace Application Security** to be enabled. If it's unavailable on your tenant, skip this objective — the error rate and latency objectives are sufficient for the workshop. The principle (SRG can gate on security KPIs the same way it gates on performance KPIs) is the key takeaway.
 
-Save the Guardian. Note the **Guardian ID** from the URL — it looks like `guardian-XXXXXXXXXXXXXXXX`.
+Save the Guardian. You will select it by name in the Workflow's Site Reliability Guardian action in Section 3.
 
 ---
 
@@ -112,9 +112,11 @@ In the `kkm-pulse-demo` GitLab project, add two CI/CD variables:
 | Key | Value | Mask? |
 |---|---|---|
 | `DT_PLATFORM_TOKEN` | the token you just generated | Yes |
-| `SRG_GUARDIAN_ID` | your guardian ID (e.g., `guardian-XXXXXXXXXXXXXXXX`) | No |
+| `SRG_WORKFLOW_ID` | the ID of the Dynatrace Workflow that contains the Site Reliability Guardian action (the UUID in the Workflow URL, e.g., `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) | No |
 
-![Adding DT_PLATFORM_TOKEN and SRG_GUARDIAN_ID as CI/CD variables in GitLab Settings → CI/CD → Variables](img/usecase6-gitlab-srg-vars.png)
+!!! note "Workflow ID instead of Guardian ID"
+    The Guardian ID is no longer used. The Site Reliability Guardian is run as an action inside the Workflow, so you only need the **Workflow ID** and the platform token. You get the Workflow ID from the browser URL (`.../ui/apps/dynatrace.automations/workflows/<WORKFLOW_ID>`) once you create the Workflow in [Section 3](#3-create-a-workflow-to-evaluate-srg-after-deployment) — come back and set this variable then.
+
 
 ### GitLab connection (for Workflow to trigger rollback pipeline)
 
@@ -127,8 +129,6 @@ In GitLab: **User icon → Edit profile → Access tokens → Add new token**
 | **Token name** | `Dynatrace Workflow rollback` |
 | **Scopes** | `api` |
 
-![GitLab User Settings → Access Tokens — creating Dynatrace Workflow rollback token with api scope](img/usecase6-gitlab-pat.png)
-
 Copy the generated token.
 
 In Dynatrace: **Apps → Connections → + New connection → GitLab**
@@ -138,8 +138,6 @@ In Dynatrace: **Apps → Connections → + New connection → GitLab**
 | **Connection name** | `GitLab kkm-pulse-demo` |
 | **GitLab URL** | `https://gitlab.com` |
 | **Personal access token** | the token you just copied |
-
-![Dynatrace Apps → Connections — creating new GitLab connection with URL and Personal Access Token](img/usecase6-dt-gitlab-connection.png)
 
 Save the connection. It appears in the action picker as a selectable credential — the token is stored encrypted and never exposed in Workflow logs or definitions.
 
@@ -158,11 +156,10 @@ In Dynatrace: **Apps → Workflows → + New Workflow**
 | Field | Value |
 |---|---|
 | **Event type** | `Custom deployment event` |
-| **Filter condition** | `event.name == "kkm-pulse-demo" AND event.deployment.environment == "prod"` |
+| **Filter condition** | `event.name == "kkm-pulse-demo deployed to PRODUCTION" AND event.type == "CUSTOM_DEPLOYMENT"` |
 
 This fires once for every deployment the `notify-dynatrace-prod-deploy` job sends.
 
-![Dynatrace Workflow trigger — Custom deployment event filter for kkm-pulse-demo production](img/usecase6-workflow-trigger.png)
 
 ### Action 1 — Wait for metrics to stabilize
 
@@ -173,7 +170,7 @@ import { execution } from "@dynatrace-sdk/automation-utils";
 
 export default async function () {
   // Allow 120 s for post-deployment metrics to propagate
-  await new Promise(r => setTimeout(r, 120_000));
+  await new Promise(r => setTimeout(r, 60_000));
   return { waited: true };
 }
 ```
@@ -182,7 +179,6 @@ export default async function () {
 |---|---|
 | **Label** | `Wait for metrics to stabilize` |
 
-![Dynatrace Workflow Action 1 — JavaScript wait action configured with 120-second delay](img/usecase6-workflow-action1.png)
 
 ### Action 2 — Trigger SRG evaluation
 
@@ -192,12 +188,11 @@ Add a **Site Reliability Guardian — Run evaluation** action (search for it in 
 |---|---|
 | **Label** | `Run SRG evaluation` |
 | **Guardian** | select `kkm-pulse-demo production` |
-| **Timeframe from** | `now-3m` |
-| **Timeframe to** | `now` |
+| **Timeframe from** | `event.event.start` |
+| **Timeframe to** | `now()` |
 
 The action completes when the evaluation finishes and exposes the result as `{{ result("Run SRG evaluation").executionStatus }}`.
 
-![Dynatrace Workflow Action 2 — Site Reliability Guardian Run evaluation with timeframe now-3m to now](img/usecase6-workflow-action2.png)
 
 !!! tip "What does the result look like?"
     The SRG action output includes `executionStatus` (`PASS` or `FAIL`), `totalScore`, and a per-objective breakdown. You can inspect it in **Workflow executions → select a run → Action 2 → Output**.
@@ -253,7 +248,6 @@ The connection you created in Section 2 must be visible to Workflows. Confirm it
 
 If it is missing, re-create it following the steps in [Section 2 — GitLab connection](#2-create-credentials).
 
-![Dynatrace Apps → Connections showing GitLab kkm-pulse-demo with Status: Connected](img/usecase6-connection-status.png)
 
 #### Step B — Add GitLab to the external request allowlist
 
@@ -268,8 +262,6 @@ In Dynatrace: **Settings → Workflows → External request allowlist → + Add 
 
 Click **Save changes**. The allowlist applies tenant-wide; any Workflow can now reach `gitlab.com` through the outbound connector.
 
-![Dynatrace Settings → Workflows → External request allowlist with gitlab.com entry added](img/usecase6-dt-allowlist.png)
-
 !!! warning "Missing allowlist entry = silent action failure"
     If `gitlab.com` is not allowlisted, the GitLab action silently fails with a connectivity error instead of surfacing a clear message. If Action 3 completes without a corresponding GitLab pipeline appearing, check **Settings → Workflows → External request allowlist** first.
 
@@ -282,7 +274,7 @@ Add a **GitLab — Trigger a new pipeline** action (search for "GitLab" in the a
 | Field | Value |
 |---|---|
 | **Label** | `Trigger GitLab rollback pipeline` |
-| **Run condition** | `{{ result("Run SRG evaluation").executionStatus == "FAIL" }}` |
+| **Run condition** | `{{ result("trigger_srg_evaluation")["validation_status"] == "fail" }}` |
 | **Connection** | `GitLab kkm-pulse-demo` |
 | **Project** | select `kkm-pulse-demo` (or enter the project path `your-group/kkm-pulse-demo`) |
 | **Ref** | `main` |
@@ -293,7 +285,7 @@ Under **Variables**, add three entries:
 |---|---|
 | `ROLLBACK` | `true` |
 | `ROLLBACK_REASON` | `Dynatrace SRG FAIL` |
-| `ROLLBACK_EVAL_ID` | `{{ result("Run SRG evaluation").evaluationId }}` |
+| `ROLLBACK_EVAL_ID` | `{{ result("Run SRG evaluation").validation_id }}` |
 
 ![Dynatrace Workflow Action 3 — GitLab Trigger a new pipeline action with ROLLBACK variables and run condition on SRG FAIL](img/usecase6-workflow-action3.png)
 
@@ -427,7 +419,7 @@ The JavaScript action waits two minutes before the SRG evaluate action runs. Exp
 
 The Workflow currently triggers a GitLab rollback but sends no human-readable alert. Extend **Action 4** (the optional notification step) so on-call receives a Slack message that includes:
 
-1. Which Guardian evaluation failed (`{{ result("Run SRG evaluation").evaluationId }}`)
+1. Which Guardian evaluation failed (`{{ result("Run SRG evaluation").validation_id }}`)
 2. The total score (`{{ result("Run SRG evaluation").totalScore }}`)
 3. A direct link to the evaluation in Dynatrace
 
@@ -448,11 +440,11 @@ Show the Workflow action configuration and the message template you would use.
     ```
     :rotating_light: *kkm-pulse-demo production rollback triggered*
 
-    SRG evaluation `{{ result("Run SRG evaluation").evaluationId }}` returned *FAIL* (score: {{ result("Run SRG evaluation").totalScore }}).
+    SRG evaluation `{{ result("Run SRG evaluation").validation_id }}` returned *FAIL* (score: {{ result("Run SRG evaluation").totalScore }}).
 
     GitLab rollback pipeline has been triggered automatically.
 
-    View evaluation: {{ your-tenant }}/ui/srg/evaluations/{{ result("Run SRG evaluation").evaluationId }}
+    View evaluation: {{ your-tenant }}/ui/srg/evaluations/{{ result("Run SRG evaluation").validation_id }}
     ```
 
     **Why this matters:**

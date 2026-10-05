@@ -104,9 +104,6 @@ git push
 
 1. Push a normal change, watch the pipeline run through `load_test`
 2. In **CI/CD → Pipelines**, open the pipeline — `deploy-prod` appears in the graph with a ▶️ (manual) icon, available to click
-
-![GitLab pipeline showing deploy-prod stage with manual approval icon after load test passes](img/usecase5-manual-gate.png)
-
 3. Click it, then confirm `kkm-pulse-prod` is running and open it in your browser:
 
     ```bash
@@ -144,7 +141,7 @@ Introduce an **intermittent failure** — the kind that slips past unit tests be
 let hits = 0;
 app.get('/api/status', (req, res) => {
   hits++;
-  if (hits > 5) {
+  if (hits > 10) {
     if (Math.random() < 0.5) {
         res.status(500).json({ error: "intermittent failure — simulated for the workshop" });
     } else {
@@ -184,7 +181,6 @@ Watch what happens:
 - `notify-dynatrace-test-result` fails the error-budget check and exits non-zero
 - `deploy_prod` never appears as an available stage — there is no ▶️ button to click
 
-![GitLab pipeline showing deploy_prod stage absent after load test gate failure](img/usecase5-gate-blocked.png)
 
 This is the key insight: the unit tests gave you a **false green**. The load test gate is what actually caught the regression before it reached production.
 

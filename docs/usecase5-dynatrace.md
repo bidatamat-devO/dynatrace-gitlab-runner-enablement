@@ -76,19 +76,14 @@ notify-dynatrace-deploy:
         "entitySelector": "type(SERVICE),tag(k8s.namespace.name:kkm-pulse-dev)",
         "properties": {
           "dt.event.deployment.name":    "kkm-pulse-demo",
-          "deploymentVersion":           "${CI_COMMIT_SHORT_SHA}",
           "source":                      "GitLab CI",
-          "ciBackLink":                  "${CI_JOB_URL}",
-          "GitLabUrl":                   "${CI_PROJECT_URL}",
+          "environment":                 "dev",
           "GitCommit":                   "${CI_COMMIT_SHA}",
           "Owner":                       "platform-team",
           "Approval":                    "${GITLAB_USER_NAME}",
-          "environment":                 "dev",
           "branch":                      "${CI_COMMIT_REF_NAME}",
-          "commitAuthor":                "${CI_COMMIT_AUTHOR}",
           "pipelineUrl":                 "${CI_PIPELINE_URL}",
-          "projectName":                 "${CI_PROJECT_NAME}",
-          "runnerTags":                  "${CI_RUNNER_TAGS}"
+          "projectName":                 "${CI_PROJECT_NAME}"
         }
       }
       EOF

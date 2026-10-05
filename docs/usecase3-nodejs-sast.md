@@ -125,7 +125,6 @@ cat ~/.ssh/id_ed25519.pub
     2. Project name: `kkm-pulse-demo`, **do not** initialize with a README (we're pushing existing history)
     3. Click **Create project** and copy the SSH clone URL, e.g. `git@gitlab.com:<your-username>/kkm-pulse-demo.git`
 
-![Creating blank project kkm-pulse-demo in GitLab](img/usecase2-create-project.png)
 
 From inside `.devcontainer/apps/kkm-pulse-demo` (it's already its own git repository):
 
@@ -147,7 +146,6 @@ Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its 
 1. In the `kkm-pulse-demo` project: **Settings → CI/CD → Runners → New project runner**
 2. Tags: `shell`, and Create the Runner
 
-![Settings → CI/CD → Runners → New project runner for kkm-pulse-demo](img/usecase2-create-runner.png)
 
 3. Install the Gitlab Runner
 
@@ -167,8 +165,6 @@ Runners are registered per-project on GitLab.com, so `kkm-pulse-demo` needs its 
   ```
 
 4. Copy the one-time registration token shown after creating the runner
-
-![Copying the glrt- token for kkm-pulse-demo runner](img/usecase2-runner-token.png)
 
    Then run below command with the valid `glrt-...` token
 
@@ -376,8 +372,6 @@ git push
 
 1. Watch `sonarqube-check` run in **CI/CD → Pipelines**
 2. Back in the SonarQube UI, open **Projects → kkm-pulse-demo** and confirm the analysis landed with a Quality Gate result
-
-![SonarQube Projects → kkm-pulse-demo showing Quality Gate result after pipeline analysis](img/usecase2-sonar-quality-gate.png)
 
 ---
 
