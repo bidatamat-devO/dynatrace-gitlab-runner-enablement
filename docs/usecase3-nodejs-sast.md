@@ -313,7 +313,7 @@ In the `kkm-pulse-demo` project: **Settings → CI/CD → Variables → Add vari
 
 | Key | Value | Mask? |
 |---|---|---|
-| `SONAR_HOST_URL` | `http://localhost:9000` (the runner and SonarQube share the same Codespace host) | No |
+| `SONAR_HOST_URL` | `https://generate-sonar-codespace-9000.app.github.dev` (the runner and SonarQube share the same Codespace host) | No |
 | `SONAR_TOKEN` | the token you generated above | Yes |
 
 ![Adding SONAR_HOST_URL and SONAR_TOKEN as CI/CD variables in GitLab Settings → CI/CD → Variables](img/usecase2-gitlab-sonar-vars.png)

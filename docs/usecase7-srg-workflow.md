@@ -22,11 +22,9 @@ In Dynatrace, navigate to **Apps → Site Reliability Guardian** (search for it 
 
 Click **+ New Guardian**, then choose **Choose Template** and select **Four Golden Signals**.
 
-![Dynatrace Site Reliability Guardian — creating new Guardian with Four Golden Signals template](img/usecase6-srg-new-guardian.png)
 
 On the **Getting started with template** popup, click **Run Query**, select **kkm-pulse-demo**, and click **Apply Template**.
 
-![SRG Getting started popup — Run Query selecting kkm-pulse-demo service and Apply Template](img/usecase6-srg-apply-template.png)
 
 ### Configure the four golden signal objectives
 
@@ -64,7 +62,6 @@ The template pre-creates four objectives. Set the **Fails if result** and **Warn
 | **Fails if result** | `< 1` |
 | **Warning if result** | `< 5` |
 
-![SRG objectives — Latency, Saturation, Errors and Traffic thresholds configured](img/usecase6-srg-objectives.png)
 
 !!! info "Threshold units"
     Latency thresholds are in **milliseconds**. Saturation and Errors thresholds are in **percentage (%)** of requests or resource usage. Traffic is a **request-per-minute** floor — a value below this indicates the service is not receiving meaningful load and may have stalled.
@@ -82,8 +79,6 @@ Click **Add More objective** for each of the two below.
 | **Fails if result** | `> 50` |
 | **Warning if result** | `> 40` |
 
-![SRG custom objective — Average CPU usage DQL query and threshold configuration](img/usecase6-srg-cpu-objective.png)
-
 #### Objective 6 — Critical Security Vulnerabilities
 
 | Field | Value |
@@ -92,14 +87,12 @@ Click **Add More objective** for each of the two below.
 | **DQL** | `fetch security.events | filter event.provider=="Dynatrace" | filter event.kind=="SECURITY_EVENT" | filter event.type=="VULNERABILITY_STATE_REPORT_EVENT" | filter event.level=="ENTITY" | fieldsAdd matcher="match" | lookup [ fetch security.events | filter event.provider=="Dynatrace" | filter event.kind=="SECURITY_EVENT" | filter event.type=="VULNERABILITY_STATE_REPORT_EVENT" | filter event.level=="ENTITY" | fields maxTimestamp=timestamp, matcher="match" | limit 1 ], sourceField:matcher, lookupField:matcher, fields:{maxTimestamp} | filter timestamp==maxTimestamp | filter event.status=="OPEN" | filter in(vulnerability.risk.level,{"CRITICAL","HIGH"}) | filter in(affected_entity.id, {"PROCESS_GROUP-A085A3959D385BE8"}) | summarize Filtered_high-profile_vulnerabilities=arraySize(collectDistinct(vulnerability.id))` |
 | **Fails criterion** | `> 0` |
 
-![SRG custom objective — Critical Security Vulnerabilities DQL query with OPEN CRITICAL/HIGH filter](img/usecase6-srg-security-objective.png)
+![SRG objectives — Latency, Saturation, Errors and Traffic thresholds configured](img/usecase6-srg-objectives.png)
 
 !!! info "Application Security required"
     The security objective requires **Dynatrace Application Security** to be enabled. If it's unavailable on your tenant, skip this objective — the error rate and latency objectives are sufficient for the workshop. The principle (SRG can gate on security KPIs the same way it gates on performance KPIs) is the key takeaway.
 
 Save the Guardian. Note the **Guardian ID** from the URL — it looks like `guardian-XXXXXXXXXXXXXXXX`.
-
-![SRG Guardian saved — Guardian ID visible in the browser URL bar](img/usecase6-srg-guardian-id.png)
 
 ---
 
@@ -113,8 +106,6 @@ In Dynatrace: **Settings → Access tokens → Generate new token**
 |---|---|
 | **Name** | `kkm-pulse-demo SRG workflow` |
 | **Scopes** | `Davis data: Read` · `Site Reliability Guardian: Read evaluations` · `Site Reliability Guardian: Write evaluations` |
-
-![Dynatrace Settings → Access tokens — generating SRG workflow token with required scopes](img/usecase6-dt-platform-token.png)
 
 In the `kkm-pulse-demo` GitLab project, add two CI/CD variables:
 
