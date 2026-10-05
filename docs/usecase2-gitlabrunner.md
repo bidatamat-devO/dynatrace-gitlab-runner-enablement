@@ -11,7 +11,7 @@ In this use case you will create your first project on **GitLab.com**, connect y
 !!! example "Step-by-step"
     1. Log in to [gitlab.com](https://gitlab.com) (or create a free account)
     2. Click **Create new... → New project/repository → Create blank project**
-    3. Project name: `firstproject`, visibility: your choice (Private is fine)
+    3. Project name: `secondproject`, visibility: your choice (Private is fine)
     4. Leave "Initialize repository with a README" **checked**, then **Create project**
 
 ![Create a new blank project in GitLab](img/usecase1-create-project.png)
@@ -55,29 +55,6 @@ deploy-job:
 
 !!! info "Nothing will run yet"
     Open ** → Pipelines** in GitLab and you'll see the pipeline stuck **pending** — there is no runner registered against this project yet. That's what the rest of this use case fixes.
-
----
-
-## 3. Install GitLab Runner inside the Codespace
-
-The Codespace already has Docker, `kubectl`, `k3d`, and Node.js installed and a k3d cluster running — installing the runner as a **shell executor** lets every pipeline job use those tools directly, with no extra Docker-in-Docker setup.
-
-!!! note "Already installed in Use Case 1?"
-    Use Case 1 installs the runner binary for you. If `gitlab-runner --version` already works in your terminal, skip the commands below and continue at section 4 to register a runner for this new project.
-
-```bash
-# Download the binary for the codespace's architecture (amd64 shown; use arm64 on Apple Silicon)
-sudo curl -L --output /usr/local/bin/gitlab-runner \
-  https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64
-
-# Give it permission to execute
-sudo chmod +x /usr/local/bin/gitlab-runner
-
-# Create a dedicated GitLab Runner user
-sudo useradd --comment 'GitLab Runner' --create-home gitlab-runner --shell /bin/bash
-```
-
-![Running the GitLab Runner installation commands in the Codespace terminal](img/usecase1-install-runner.png)
 
 ---
 

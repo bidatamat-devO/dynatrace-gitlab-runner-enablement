@@ -16,6 +16,8 @@ You need a **GitLab Runner** to execute the jobs, so you will install one inside
     3. Project name: `pipelinestages`, visibility: your choice (Private is fine)
     4. Leave "Initialize repository with a README" **checked**, then **Create project**
 
+    ![Create a new blank project in GitLab](img/create-project-gitlab.png)
+
 ---
 
 ## 2. Deploy a GitLab Runner in the Codespace
@@ -49,7 +51,13 @@ sudo gitlab-runner register \
   --token "<glrt-...-paste-your-token-here>" \
   --executor "shell" \
   --description "codespace-shell-runner"
+```
 
+![Create a new blank project in GitLab](img/usecase1-gitlab-runner.png)
+
+Run the gitlab process
+
+```
 gitlab-runner run
 ```
 
@@ -75,7 +83,6 @@ Keep this terminal open. **Settings → CI/CD → Runners** should show the runn
 ```yaml
 build_car:
     image: alpine
-    stage: build
     script:
         - echo "Hello, $USER!"
         - echo "build the car pipeline"
@@ -85,6 +92,9 @@ build_car:
         - cat build/car.txt
         - echo "Congratulation!!!"
 ```
+
+![Create a new blank project in GitLab](img/gitlab-pipeline.png)
+
 
 The job should turn **green**. Open it and read the log — the `cat` output shows `chassis`.
 
@@ -100,7 +110,6 @@ Edit `.gitlab-ci.yml` in the Web IDE and append the `test_car` job:
 ```yaml
 build_car:
     image: alpine
-    stage: build
     script:
         - echo "Hello, $USER!"
         - echo "build the car pipeline"
@@ -112,7 +121,6 @@ build_car:
 
 test_car:
     image: alpine
-    stage: test
     script:
         - echo "oppss!!! the pipeline break"
         - test -f build/car.txt
@@ -236,7 +244,7 @@ Commit and open the pipeline. How many columns do you see, and which jobs run in
     stages:
         - build
         - test
-        - deploy
+        - deploy  # <- added
 
     build_car:
         image: alpine
@@ -255,13 +263,13 @@ Commit and open the pipeline. How many columns do you see, and which jobs run in
             - test -f build/car.txt
             - grep "chassis" build/car.txt
 
-    test_wheels:
+    test_wheels: # <- add test wheels
         image: alpine
         stage: test
         script:
             - test -f build/car.txt
 
-    deploy_car:
+    deploy_car: # <- add deploy car stages
         image: alpine
         stage: deploy
         script:
