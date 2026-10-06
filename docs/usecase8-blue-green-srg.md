@@ -276,8 +276,6 @@ In the GitLab Web IDE, create a new branch `feature/usecase7-bluegreen` with a s
 
 In GitLab, open a **New merge request** from `feature/usecase7-bluegreen` to `main`.
 
-![GitLab — opening a new merge request from feature/usecase7-bluegreen to main](img/usecase7-open-mr.png)
-
 ### Watch the MR pipeline
 
 In **CI/CD → Pipelines** (filtered to this MR), you should see:
@@ -285,8 +283,6 @@ In **CI/CD → Pipelines** (filtered to this MR), you should see:
 1. `build`, `test`, `code_quality`, `package`, `deploy_dev`, `load_test` — these run as normal
 2. `deploy-green` — deploys the candidate to `kkm-pulse-green`
 3. `srg-gate` — triggers an SRG evaluation, waits up to 10 minutes, exits 0 on PASS
-
-![GitLab MR pipeline showing deploy-green and srg-gate stages running](img/usecase7-mr-pipeline-running.png)
 
 While `srg-gate` is running, verify the green deployment is live:
 
@@ -309,8 +305,6 @@ kubectl get deployments -A | grep kkm-pulse
 ### After SRG PASS
 
 When `srg-gate` exits 0, the MR pipeline shows all green. The **Merge** button in the GitLab MR is now available. Click **Merge**.
-
-![GitLab MR showing all pipeline stages green and Merge button available after SRG PASS](img/usecase7-mr-pipeline-pass.png)
 
 The merge triggers a `main` pipeline. After `deploy_prod` and `notify-dynatrace-prod-deploy` complete, `promote-green` runs and patches the ingress:
 
@@ -357,8 +351,6 @@ Open a **New merge request** from `feature/broken-release` to `main`.
 In GitLab's MR view, the **Merge** button is greyed out with the message:
 > **Merge blocked: pipeline has failed**
 
-![GitLab MR showing Merge blocked due to failed pipeline after SRG FAIL](img/usecase7-mr-blocked.png)
-
 Blue is unaffected — confirm production is still serving the working version:
 
 ```bash
@@ -367,8 +359,6 @@ curl -H "Host: kkm-pulse.127.0.0.1.sslip.io" http://localhost/api/status
 ```
 
 Open **Apps → Site Reliability Guardian** in Dynatrace and find the evaluation. The per-objective breakdown shows which threshold was breached. This is the signal the developer needs to fix the regression before the MR can land.
-
-![Dynatrace SRG evaluation showing FAIL result with per-objective breakdown of breached thresholds](img/usecase7-srg-fail.png)
 
 ### Revert and close the MR
 
