@@ -165,11 +165,7 @@ The last four lines are the smoke test. `kubectl port-forward` opens a tunnel fr
 !!! note "Why not curl the hostname directly?"
     `kkm-pulse-dev.127.0.0.1.sslip.io` resolves to `127.0.0.1` via public DNS, but that lookup can fail or be blocked from inside the CI runner's network context. Port-forward is always reliable because it goes through the Kubernetes API server, not the network path.
 
-```bash
-git add manifests/ .gitlab-ci.yaml
-git commit -m "ci: build docker image and deploy to k3d"
-git push
-```
+Commit and push the changes in the GitLab Web IDE.
 
 ---
 

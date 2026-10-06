@@ -84,11 +84,7 @@ notify-dynatrace-prod-deploy:
       -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo deployed to PRODUCTION\",\"entitySelector\":\"type(SERVICE),tag(k8s.namespace.name:kkm-pulse-prod)\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"version\":\"${CI_COMMIT_SHORT_SHA}\",\"environment\":\"prod\"}}"
 ```
 
-```bash
-git add manifests/ingress-prod.yaml .gitlab-ci.yaml
-git commit -m "ci: add gated production deployment"
-git push
-```
+Commit and push the changes in the GitLab Web IDE.
 
 ### Why this is a real gate, not decoration
 
@@ -167,11 +163,7 @@ app.get('/api/status', (req, res) => {
 });
 ```
 
-```bash
-git add server.js
-git commit -m "chore: simulate intermittent failure for workshop"
-git push
-```
+Commit and push the changes in the GitLab Web IDE.
 
 Watch what happens:
 
@@ -189,12 +181,7 @@ This is the key insight: the unit tests gave you a **false green**. The load tes
 
 Check the events feed in Dynatrace — you'll see the dev `CUSTOM_DEPLOYMENT` and the `CUSTOM_INFO` load-test-result event with `error_rate_pct` around 50, but no production deployment event, because it never ran.
 
-Revert the change once you've seen it:
-
-```bash
-git revert HEAD --no-edit
-git push
-```
+Revert the change in the Web IDE once you've seen it, then commit and push.
 
 ---
 

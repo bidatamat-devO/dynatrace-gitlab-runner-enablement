@@ -70,6 +70,11 @@ Build the image, run it, and test it (the Codespace has Docker available):
 ```bash
 docker build -t kkm-pulse-demo:local .
 docker run -d --name kkm-pulse -p 3000:3000 kkm-pulse-demo:local
+```
+
+Check the images or Docker container you just run:
+
+```
 curl http://localhost:3000/api/status
 ```
 
@@ -81,6 +86,8 @@ docker ps                         # the running container
 docker logs kkm-pulse             # app output (KKM Pulse App running hot on port 3000)
 docker exec -it kkm-pulse sh      # open a shell inside the container
 ```
+
+To exit from the Container type ```exit```
 
 Clean up when you're done:
 
@@ -129,11 +136,10 @@ cat ~/.ssh/id_ed25519.pub
 From inside `.devcontainer/apps/kkm-pulse-demo` (it's already its own git repository):
 
 ```bash
-git remote remove origin 2>/dev/null || true
-git remote add origin git@gitlab.com:<your-username>/kkm-pulse-demo.git
-git remote set-url origin git@gitlab.com:<your-username>/kkm-pulse-demos.git
+git init --initial-branch=main --object-format=sha1
+git remote add origin git@gitlab.com:<your-group-username>/x-project.git ## if error to add: git remote set-url origin git@gitlab.com:<your-username>/kkm-pulse-demos.git
 git add .
-git commit -m "initial commit: kkm-pulse-demo" --allow-empty
+git commit -m "Initial commit"
 git push --set-upstream origin main
 ```
 
@@ -218,6 +224,8 @@ test-job:
     - npm test
 ```
 
+you can manually from project command promp like below, or commit from the Gitlab Web IDE
+
 ```bash
 git add .gitlab-ci.yaml
 git commit -m "ci: build and test stages"
@@ -245,7 +253,7 @@ variables:
   SAST_DISABLED: "true"
 ```
 
-Push it and look at the **Test** stage in the pipeline graph — you'll see the `semgrep-sast` job appear and pass instantly as a no-op, thanks to `SAST_DISABLED`.
+Push the changes in the Web IDE, then look at the **Test** stage in the pipeline graph — you'll see the `semgrep-sast` job appear and pass instantly as a no-op, thanks to `SAST_DISABLED`.
 
 !!! info "Why not just use the docker executor?"
     You could — the Codespace's Docker socket is available — but then every job in the pipeline needs its own container image with Node, kubectl, docker, and helm baked in, and `docker build`/`kubectl` need extra wiring to reach the host's daemon and cluster from inside a container. The shell executor keeps this workshop simple by running jobs directly on the Codespace, which already has everything installed.
@@ -362,11 +370,7 @@ sonarqube-check:
     - if: $CI_COMMIT_BRANCH == 'main'
 ```
 
-```bash
-git add .gitlab-ci.yaml
-git commit -m "ci: add sonarqube quality gate"
-git push
-```
+Commit and push the changes in the GitLab Web IDE.
 
 ### Validate
 

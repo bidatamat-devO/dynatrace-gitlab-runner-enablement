@@ -337,11 +337,7 @@ rollback-prod:
       -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo ROLLBACK triggered by Dynatrace\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"environment\":\"prod\",\"reason\":\"${ROLLBACK_REASON}\",\"triggered_by\":\"Dynatrace Workflow\",\"srg_evaluation_id\":\"${ROLLBACK_EVAL_ID}\"}}"
 ```
 
-```bash
-git add .gitlab-ci.yaml
-git commit -m "ci: add Dynatrace-triggered rollback job"
-git push
-```
+Commit and push the changes in the GitLab Web IDE.
 
 Normal pipeline runs skip `rollback-prod` entirely because `$ROLLBACK` is unset. Only the Dynatrace Workflow-triggered pipeline runs it.
 

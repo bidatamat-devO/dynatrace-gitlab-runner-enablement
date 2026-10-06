@@ -189,11 +189,7 @@ notify-dynatrace-test-result:
 
 `load-test` records its numbers via a [`dotenv` artifact](https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsreportsdotenv), so `notify-dynatrace-test-result` can read `$LOADTEST_ERROR_RATE` etc. straight from the environment — no need to re-run the test or parse logs.
 
-```bash
-git add .gitlab-ci.yaml
-git commit -m "ci: dynatrace deployment events and load test"
-git push
-```
+Commit and push the changes in the GitLab Web IDE.
 
 ---
 

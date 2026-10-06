@@ -117,13 +117,7 @@ kubectl get configmap kkm-bluegreen-state -n default -o jsonpath='{.data.active}
 curl -H "Host: kkm-pulse.127.0.0.1.sslip.io" http://localhost/api/status
 ```
 
-Commit the new manifests:
-
-```bash
-git add manifests/ingress-bluegreen.yaml manifests/bluegreen-state.yaml
-git commit -m "ci: add blue-green ingress and state ConfigMap"
-git push
-```
+Commit and push the new manifests in the GitLab Web IDE.
 
 ---
 
@@ -224,11 +218,7 @@ srg-gate:
     - echo "SRG PASS — evaluation ${EVAL_ID} — merge is unblocked."
 ```
 
-```bash
-git add .gitlab-ci.yaml
-git commit -m "ci: add blue-green deploy-green and srg-gate jobs"
-git push
-```
+Commit and push the changes in the GitLab Web IDE.
 
 !!! info "Why `$CI_PIPELINE_SOURCE == 'merge_request_event'`?"
     GitLab runs a separate pipeline for merge requests and a separate one for pushes to branches. Using this rule, `deploy-green` and `srg-gate` run only on the MR pipeline — they don't fire on every push to a feature branch, only when the developer opens or updates a merge request targeting `main`. The `promote-green` job (Section 5) uses the opposite rule and runs only after the merge lands on `main`.
@@ -274,11 +264,7 @@ promote-green:
       -d "{\"eventType\":\"CUSTOM_DEPLOYMENT\",\"title\":\"kkm-pulse-demo promoted green→production\",\"properties\":{\"dt.event.deployment.name\":\"kkm-pulse-demo\",\"version\":\"${CI_COMMIT_SHORT_SHA}\",\"environment\":\"prod\",\"slot\":\"green\"}}"
 ```
 
-```bash
-git add .gitlab-ci.yaml
-git commit -m "ci: add promote-green traffic switch job"
-git push
-```
+Commit and push the changes in the GitLab Web IDE.
 
 ---
 
@@ -286,16 +272,7 @@ git push
 
 ### Open a merge request
 
-Create a feature branch with a small, safe change:
-
-```bash
-git checkout -b feature/usecase7-bluegreen
-# Make any trivial change — e.g., update a comment in server.js
-echo "// blue-green workshop" >> server.js
-git add server.js
-git commit -m "feat: add blue-green workshop marker"
-git push -u origin feature/usecase7-bluegreen
-```
+In the GitLab Web IDE, create a new branch `feature/usecase7-bluegreen` with a small, safe change — e.g., add a comment line `// blue-green workshop` to `server.js`. Commit and push the changes to that branch.
 
 In GitLab, open a **New merge request** from `feature/usecase7-bluegreen` to `main`.
 
@@ -354,11 +331,7 @@ The blue namespace is still running — it's your instant rollback target.
 
 ### Introduce a regression on a new branch
 
-```bash
-git checkout -b feature/broken-release
-```
-
-Edit `server.js` to inject failures on every request:
+In the GitLab Web IDE, create a new branch `feature/broken-release`, then edit `server.js` to inject failures on every request:
 
 ```js title="server.js (edit — temporary)" linenums="1"
 app.get('/api/status', (req, res) => {
@@ -366,11 +339,7 @@ app.get('/api/status', (req, res) => {
 });
 ```
 
-```bash
-git add server.js
-git commit -m "feat: broken release (use case 8 test)"
-git push -u origin feature/broken-release
-```
+Commit and push the changes to the `feature/broken-release` branch in the Web IDE.
 
 Open a **New merge request** from `feature/broken-release` to `main`.
 
@@ -403,10 +372,7 @@ Open **Apps → Site Reliability Guardian** in Dynatrace and find the evaluation
 
 ### Revert and close the MR
 
-```bash
-git checkout main
-git push origin --delete feature/broken-release
-```
+Close the merge request and delete the `feature/broken-release` branch from the GitLab UI.
 
 ---
 
